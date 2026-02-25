@@ -7,6 +7,7 @@ import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChar
 import type { Product, CartItem } from '../types';
 import AIAssistant from '../components/AIAssistant';
 import Receipt from '../components/Receipt'; // <--- 1. Import Receipt
+import { useLanguage } from '../context/LanguageContext';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function Dashboard() {
   // --- NEW: PRINTING STATE ---
   const [lastSale, setLastSale] = useState<{ id: number; items: CartItem[]; total: number; date: string } | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const { t, toggleLanguage } = useLanguage();
 
   const username = localStorage.getItem('username') || 'User';
   const role = localStorage.getItem('role') || 'Cashier';
@@ -146,7 +148,7 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col min-w-0 print:hidden">
         <header className="bg-white shadow-sm p-4 flex justify-between items-center z-10">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">POS System</h1>
+            <h1 className="text-xl font-bold text-gray-800">{t('dashboard')}</h1>
             <p className="text-xs text-gray-500">{username} ({role})</p>
           </div>
           
@@ -158,7 +160,7 @@ export default function Dashboard() {
                   className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-indigo-200"
                 >
                   <BarChart3 size={16} /> 
-                  <span className="hidden sm:inline">Sales Report</span>
+                  <span className="hidden sm:inline">{t('reports')}</span>
                 </button>
 
                 <button 
@@ -166,13 +168,22 @@ export default function Dashboard() {
                   className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                 >
                   <Settings size={16} /> 
-                  <span className="hidden sm:inline">Manage Inventory</span>
+                  <span className="hidden sm:inline">{t('products')}</span>
                 </button>
               </>
             )}
 
+            {/* --- NEW: LANGUAGE TOGGLE BUTTON --- */}
+            <button 
+              onClick={toggleLanguage}
+              className="flex items-center justify-center w-10 h-10 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-bold transition-colors border border-blue-200 shadow-sm"
+              title="Toggle Language"
+            >
+              {t('switch_lang')}
+            </button>
+
             <button onClick={handleLogout} className="flex items-center gap-2 text-red-600 hover:text-red-800 px-2">
-              <LogOut size={18} /> <span className="hidden sm:inline">Logout</span>
+              <LogOut size={18} /> <span className="hidden sm:inline">{t('logout')}</span>
             </button>
           </div>
         </header>
@@ -183,26 +194,30 @@ export default function Dashboard() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input 
               type="text" 
-              placeholder="Search..." 
+              placeholder={t('search_placeholder')} 
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${
-                  selectedCategory === cat 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-white text-gray-600 border border-gray-200'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+            {categories.map(cat => {
+              // Conditionally translate the 'All' category button
+              const displayCat = cat === 'All' ? t('all_categories') : cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${
+                    selectedCategory === cat 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white text-gray-600 border border-gray-200'
+                  }`}
+                >
+                  {displayCat}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -248,7 +263,7 @@ export default function Dashboard() {
         <div className="absolute right-0 top-0 h-full w-full md:w-96 bg-white shadow-xl flex flex-col border-l border-gray-200">
           <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
             <h2 className="font-bold text-lg flex items-center gap-2">
-              <ShoppingCart size={20} /> Current Order
+              <ShoppingCart size={20} /> {t('current_order')}
             </h2>
             <button onClick={() => setIsCartOpen(false)} className="md:hidden p-2 text-gray-500">
               <X size={24} />
@@ -259,7 +274,7 @@ export default function Dashboard() {
             {cart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-gray-400">
                 <ShoppingCart size={48} className="mb-2 opacity-20" />
-                <p>Cart is empty</p>
+                <p>{t('cart_empty')}</p>
               </div>
             ) : (
               cart.map(item => (
@@ -287,15 +302,15 @@ export default function Dashboard() {
 
           <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-3">
             <div className="flex justify-between text-sm text-gray-600">
-              <span>Subtotal</span>
+              <span>{t('subtotal')}</span>
               <span>RM {cartTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm text-gray-600 pb-2">
-              <span>SST (6%)</span>
+              <span>{t('sst_tax')}</span>
               <span>RM {cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-xl font-bold text-gray-800 pt-2 border-t border-gray-200">
-              <span>Total</span>
+              <span>{t('total')}</span>
               <span>RM {(cartTotal + cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0)).toFixed(2)}</span>
             </div>
             
@@ -305,7 +320,7 @@ export default function Dashboard() {
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               disabled={cart.length === 0}
             >
-              <Printer size={20} /> Pay & Print
+              <Printer size={20} /> {t('pay_print')}
             </button>
           </div>
         </div>

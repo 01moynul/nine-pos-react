@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, DollarSign, ShoppingBag, TrendingUp, Package, Clock } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 // --- INTERFACES ---
 interface TopSellingItem {
@@ -30,6 +31,7 @@ export default function SalesReports() {
   const navigate = useNavigate();
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
 
   // Format Money: $1,234.56
   const formatMoney = (amount: number) => {
@@ -86,8 +88,8 @@ export default function SalesReports() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Sales Analytics</h1>
-            <p className="text-sm text-gray-500">Real-time performance metrics</p>
+            <h1 className="text-2xl font-bold text-gray-800">{t('sales_analytics')}</h1>
+            <p className="text-sm text-gray-500">{t('real_time_metrics')}</p>
           </div>
         </div>
         
@@ -96,21 +98,21 @@ export default function SalesReports() {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
                 <div className="p-3 bg-green-100 text-green-600 rounded-full"><DollarSign size={24} /></div>
                 <div>
-                    <p className="text-sm text-gray-500 font-medium">Total Revenue</p>
+                    <p className="text-sm text-gray-500 font-medium">{t('total_revenue')}</p>
                     <h3 className="text-2xl font-bold text-gray-800">{formatMoney(data.total_revenue)}</h3>
                 </div>
             </div>
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
                 <div className="p-3 bg-blue-100 text-blue-600 rounded-full"><ShoppingBag size={24} /></div>
                 <div>
-                    <p className="text-sm text-gray-500 font-medium">Total Orders</p>
+                    <p className="text-sm text-gray-500 font-medium">{t('total_orders')}</p>
                     <h3 className="text-2xl font-bold text-gray-800">{data.total_orders}</h3>
                 </div>
             </div>
              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
                 <div className="p-3 bg-purple-100 text-purple-600 rounded-full"><TrendingUp size={24} /></div>
                 <div>
-                    <p className="text-sm text-gray-500 font-medium">Avg. Order Value</p>
+                    <p className="text-sm text-gray-500 font-medium">{t('avg_order_value')}</p>
                     <h3 className="text-2xl font-bold text-gray-800">{formatMoney(aov)}</h3>
                 </div>
             </div>

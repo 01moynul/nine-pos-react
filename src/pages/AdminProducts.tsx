@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Pencil, Trash2, Search, X, Save, Upload } from 'lucide-react';
 import type { Product } from '../types';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function AdminProducts() {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ export default function AdminProducts() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null); // Null means "Create Mode"
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [uploading, setUploading] = useState(false);
+  
+  const { t } = useLanguage();
 
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -149,11 +152,11 @@ export default function AdminProducts() {
           <button onClick={() => navigate('/dashboard')} className="p-2 bg-white rounded-full shadow hover:bg-gray-50">
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-2xl font-bold text-gray-800">Inventory Management</h1>
+          <h1 className="text-2xl font-bold text-gray-800">{t('inventory_mgmt')}</h1>
         </div>
         {/* ADD BUTTON NOW CONNECTED */}
         <button onClick={handleAddClick} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-md">
-          <Plus size={20} /> Add Product
+          <Plus size={20} /> {t('add_product')}
         </button>
       </div>
 
@@ -163,7 +166,7 @@ export default function AdminProducts() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input 
               type="text" 
-              placeholder="Search inventory..." 
+              placeholder={t('search_inventory')} 
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
