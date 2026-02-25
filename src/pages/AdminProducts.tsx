@@ -175,12 +175,13 @@ export default function AdminProducts() {
       <div className="max-w-6xl mx-auto bg-white rounded-b-xl shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider font-semibold">
-            <tr>
-              <th className="p-4 border-b">ID</th>
+           <tr>
+              <th className="p-4 border-b">SKU</th>
               <th className="p-4 border-b">Product</th>
               <th className="p-4 border-b">Category</th>
-              <th className="p-4 border-b">Price</th>
-              <th className="p-4 border-b">Stock</th>
+              <th className="p-4 border-b">Cost / Sell (RM)</th>
+              <th className="p-4 border-b">Stock (Avail/Rsvd)</th>
+              <th className="p-4 border-b">SST</th>
               <th className="p-4 border-b text-right">Actions</th>
             </tr>
           </thead>
@@ -189,7 +190,7 @@ export default function AdminProducts() {
                <tr><td colSpan={6} className="p-8 text-center">Loading inventory...</td></tr>
             ) : filteredProducts.map(product => (
               <tr key={product.id} className="hover:bg-blue-50 transition-colors">
-                <td className="p-4 text-gray-400">#{product.id}</td>
+                <td className="p-4 text-gray-500 text-xs font-mono">{product.sku || 'N/A'}</td>
                 <td className="p-4 font-medium text-gray-900 flex items-center gap-3">
                     <div className="w-8 h-8 bg-gray-200 rounded-full overflow-hidden">
                         {product.image_url ? <img src={product.image_url} className="w-full h-full object-cover"/> : null}
@@ -197,9 +198,15 @@ export default function AdminProducts() {
                     {product.name}
                 </td>
                 <td className="p-4"><span className="px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-600">{product.category}</span></td>
-                <td className="p-4 font-mono">${product.price.toFixed(2)}</td>
-                <td className={`p-4 font-bold ${product.stock_quantity < 10 ? 'text-red-500' : 'text-green-600'}`}>
-                    {product.stock_quantity}
+                <td className="p-4 font-mono text-sm text-gray-600">
+                  <span className="text-red-500">{product.cost_price?.toFixed(2) || '0.00'}</span> / <span className="text-green-600 font-bold">{product.price?.toFixed(2) || '0.00'}</span>
+                </td>
+                <td className="p-4 text-sm">
+                   <span className={`font-bold ${product.stock_quantity < 10 ? 'text-red-500' : 'text-green-600'}`}>{product.stock_quantity}</span> 
+                   <span className="text-gray-400 ml-1">({product.stock_reserved || 0})</span>
+                </td>
+                <td className="p-4">
+                   {product.is_sst_applicable ? <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Yes</span> : <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">No</span>}
                 </td>
                 <td className="p-4 text-right space-x-2">
                   <button onClick={() => handleEditClick(product)} className="text-blue-500 hover:text-blue-700 p-1">
@@ -230,42 +237,62 @@ export default function AdminProducts() {
             </div>
             
             <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
-                <input 
-                  type="text" 
-                  value={formData.name || ''} 
-                  onChange={e => setFormData({...formData, name: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select 
-                  value={formData.category || 'Food'} 
-                  onChange={e => setFormData({...formData, category: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                >
-                   <option value="Food">Food</option>
-                   <option value="Drinks">Drinks</option>
-                   <option value="Dessert">Dessert</option>
-                   <option value="Merch">Merch</option>
-                </select>
-              </div>
-              
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SKU / Barcode</label>
+                  <input 
+                    type="text" 
+                    value={formData.sku || ''} 
+                    onChange={e => setFormData({...formData, sku: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono text-sm"
+                    placeholder="e.g. BNDL-01"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+                  <input 
+                    type="text" 
+                    value={formData.name || ''} 
+                    onChange={e => setFormData({...formData, name: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <select 
+                    value={formData.category || 'Food'} 
+                    onChange={e => setFormData({...formData, category: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  >
+                     <option value="Food">Food</option>
+                     <option value="Drinks">Drinks</option>
+                     <option value="Dessert">Dessert</option>
+                     <option value="Merch">Merch</option>
+                  </select>
+                </div>
+                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price (RM)</label>
                   <input 
                     type="number" 
-                    value={formData.price || 0} 
-                    onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})}
+                    value={formData.cost_price || 0} 
+                    onChange={e => setFormData({...formData, cost_price: parseFloat(e.target.value)})}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sell Price (RM)</label>
+                  <input 
+                    type="number" 
+                    value={formData.price || 0} 
+                    onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-green-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Available Stock</label>
                   <input 
                     type="number" 
                     value={formData.stock_quantity || 0} 
@@ -273,11 +300,33 @@ export default function AdminProducts() {
                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reserved Stock</label>
+                  <input 
+                    type="number" 
+                    value={formData.stock_reserved || 0} 
+                    onChange={e => setFormData({...formData, stock_reserved: parseInt(e.target.value)})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
+                  />
+                </div>
+                
+                <div className="col-span-2 flex items-center gap-2 mt-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                  <input 
+                    type="checkbox" 
+                    id="sst_checkbox"
+                    checked={formData.is_sst_applicable || false} 
+                    onChange={e => setFormData({...formData, is_sst_applicable: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="sst_checkbox" className="text-sm font-medium text-gray-800 cursor-pointer">
+                    Apply 6% SST to this item
+                  </label>
+                </div>
               </div>
 
                {/* --- IMAGE UPLOAD --- */}
                <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Product Image</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 mt-4">Product Image</label>
                 <div className="flex items-center gap-4 mb-2">
                    <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
                       {uploading ? (
@@ -295,7 +344,6 @@ export default function AdminProducts() {
                    </label>
                 </div>
               </div>
-
             </div>
 
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">

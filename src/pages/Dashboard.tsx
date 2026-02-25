@@ -83,7 +83,9 @@ export default function Dashboard() {
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     const payload = { items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })) };
-    const currentTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.06;
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const sstTax = cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0);
+    const currentTotal = subtotal + sstTax;
     const currentItems = [...cart]; // Snapshot of cart
 
     try {
@@ -225,7 +227,7 @@ export default function Dashboard() {
                   </div>
                   <h3 className="font-semibold text-gray-800 text-sm truncate">{product.name}</h3>
                   <div className="flex justify-between items-center mt-1">
-                    <span className="text-green-600 font-bold text-sm">${product.price.toFixed(2)}</span>
+                    <span className="text-green-600 font-bold text-sm">RM {product.price.toFixed(2)}</span>
                     <span className="text-[10px] text-gray-400">{product.stock_quantity} left</span>
                   </div>
                 </div>
@@ -264,7 +266,7 @@ export default function Dashboard() {
                 <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                   <div>
                     <h4 className="font-medium text-sm text-gray-800">{item.name}</h4>
-                    <p className="text-xs text-gray-500">${item.price.toFixed(2)} x {item.quantity}</p>
+                    <p className="text-xs text-gray-500">RM {item.price.toFixed(2)} x {item.quantity}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center bg-white rounded-md border border-gray-200 shadow-sm">
@@ -284,9 +286,17 @@ export default function Dashboard() {
           </div>
 
           <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-3">
-            <div className="flex justify-between text-xl font-bold text-gray-800 pt-2">
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Subtotal</span>
+              <span>RM {cartTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-600 pb-2">
+              <span>SST (6%)</span>
+              <span>RM {cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-xl font-bold text-gray-800 pt-2 border-t border-gray-200">
               <span>Total</span>
-              <span>${(cartTotal * 1.06).toFixed(2)}</span>
+              <span>RM {(cartTotal + cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0)).toFixed(2)}</span>
             </div>
             
             {/* CHECKOUT BUTTON WITH PRINTER ICON */}

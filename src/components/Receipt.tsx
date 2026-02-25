@@ -54,15 +54,15 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ orderId, items, tota
       <div className="text-right space-y-1 mb-6">
         <div className="flex justify-between">
           <span>Subtotal:</span>
-          <span>{(total / 1.06).toFixed(2)}</span>
+          <span>RM {items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Tax (6%):</span>
-          <span>{(total - (total / 1.06)).toFixed(2)}</span>
+          <span>SST (6%):</span>
+          <span>RM {items.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0).toFixed(2)}</span>
         </div>
         <div className="flex justify-between font-bold text-lg border-t border-black pt-1">
           <span>TOTAL:</span>
-          <span>{total.toFixed(2)}</span>
+          <span>RM {total.toFixed(2)}</span>
         </div>
       </div>
 
