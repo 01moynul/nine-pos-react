@@ -50,10 +50,79 @@ export default function Dashboard() {
     fetchProducts();
   }, [fetchProducts]);
 
+  // --- CASHIER SCANNER LISTENER (Milestone 2 - Task 2.3) ---
+  useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Ignore keystrokes if the user is typing inside the search box
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const currentTime = Date.now();
+      // 50ms human filter: Scanners type instantly. Humans type slowly.
+      if (currentTime - lastKeyTime > 50) {
+        buffer = '';
+      }
+      lastKeyTime = currentTime;
+
+      // If the scanner hits Enter and we captured a barcode string
+      if (e.key === 'Enter' && buffer.length > 0) {
+        e.preventDefault();
+        const scannedBarcode = buffer;
+        buffer = ''; // Clear buffer immediately for the next scan
+
+        const token = localStorage.getItem('token');
+        try {
+          // 1. Query the Go Backend's Smart Scale Route
+          const response = await axios.get(`${API_URL}/api/products/scan/${scannedBarcode}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          const scannedProduct = response.data;
+
+          // 2. PRODUCT EXISTS: Drop it instantly into the active cart
+          setCart(prev => {
+            const existing = prev.find(item => item.id === scannedProduct.id);
+            if (existing) {
+              // If it's already in the cart, just increase the quantity by 1
+              return prev.map(item => 
+                item.id === scannedProduct.id ? { ...item, quantity: item.quantity + 1 } : item
+              );
+            }
+            // If it's new to the cart, add it with a quantity of 1
+            return [...prev, { ...scannedProduct, quantity: 1 }];
+          });
+
+          // 3. Auto-open the cart sidebar on mobile/smaller screens so the cashier sees it
+          setIsCartOpen(true);
+
+        } catch (error: unknown) {
+          interface ApiError { response?: { status: number; }; }
+          const apiError = error as ApiError;
+          
+          // 4. PRODUCT NOT FOUND: Show an immediate warning to the cashier
+          if (apiError.response && apiError.response.status === 404) {
+            alert(`Item Not Found in Database: ${scannedBarcode}`);
+          }
+        }
+      } else if (e.key.length === 1) { // Ignore meta keys
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [API_URL]);
+  // ---------------------------------------------------------
+
   const handleLogout = () => {
     localStorage.clear();
     navigate('/');
   };
+
 
   const addToCart = (product: Product) => {
     setCart(prev => {

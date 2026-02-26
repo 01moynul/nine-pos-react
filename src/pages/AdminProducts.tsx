@@ -1,6 +1,6 @@
 // src/pages/AdminProducts.tsx
 
-import { useEffect, useState, useCallback, type ChangeEvent } from 'react';
+import { useEffect, useState, useCallback, useRef, type ChangeEvent } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Pencil, Trash2, Search, X, Save, Upload } from 'lucide-react';
@@ -20,8 +20,71 @@ export default function AdminProducts() {
   const [uploading, setUploading] = useState(false);
   
   const { t } = useLanguage();
-
+  
   const API_URL = import.meta.env.VITE_API_URL;
+
+  // --- RAPID CATALOG UI: SCANNER LISTENER (Task 1.3) ---
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Ignore keystrokes if the user is typing inside an existing input field or text area
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const currentTime = Date.now();
+      // Scanners type instantly (< 30ms per key). Humans type slowly. 
+      // If there is a pause, it's a human. Reset the buffer.
+      if (currentTime - lastKeyTime > 50) {
+        buffer = '';
+      }
+      lastKeyTime = currentTime;
+
+      // If the scanner hits Enter and we captured a barcode string
+      if (e.key === 'Enter' && buffer.length > 0) {
+        e.preventDefault();
+        const scannedBarcode = buffer;
+        buffer = ''; // Clear buffer immediately for the next scan
+
+        const token = localStorage.getItem('token');
+        try {
+          // 1. Query the Go Backend's new Smart Scale Route
+          const response = await axios.get(`${API_URL}/api/products/scan/${scannedBarcode}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          // 2. PRODUCT EXISTS: Filter the UI to show the scanned item
+          setSearchTerm(response.data.sku || scannedBarcode);
+          
+        } catch (error: unknown) {
+          interface ApiError { response?: { status: number; }; }
+          const apiError = error as ApiError;
+          
+          // 3. PRODUCT NOT FOUND (404): Auto-trigger the Rapid Input Form
+          if (apiError.response && apiError.response.status === 404) {
+            setEditingProduct(null); // Set to "Create Mode"
+            setFormData({ sku: scannedBarcode }); // Auto-fill the scanned SKU
+            setIsModalOpen(true); // Pop open the modal
+            
+            // 4. Snap the keyboard focus directly to the "Product Name" field
+            setTimeout(() => {
+              nameInputRef.current?.focus();
+            }, 100);
+          }
+        }
+      } else if (e.key.length === 1) { // Ignore meta keys like Shift, Ctrl
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [API_URL]);
+  // -----------------------------------------------------
 
   const role = localStorage.getItem('role');
 
@@ -243,7 +306,7 @@ export default function AdminProducts() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">SKU / Barcode</label>
-                  <input 
+                  <input
                     type="text" 
                     value={formData.sku || ''} 
                     onChange={e => setFormData({...formData, sku: e.target.value})}
@@ -254,6 +317,7 @@ export default function AdminProducts() {
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
                   <input 
+                    ref={nameInputRef}
                     type="text" 
                     value={formData.name || ''} 
                     onChange={e => setFormData({...formData, name: e.target.value})}
