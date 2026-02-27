@@ -8,6 +8,7 @@ import type { Product, CartItem } from '../types';
 import AIAssistant from '../components/AIAssistant';
 import Receipt from '../components/Receipt'; // <--- 1. Import Receipt
 import { useLanguage } from '../context/LanguageContext';
+import { FileText } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -230,6 +231,14 @@ export default function Dashboard() {
                 >
                   <BarChart3 size={16} /> 
                   <span className="hidden sm:inline">{t('reports')}</span>
+                </button>
+
+                <button 
+                  onClick={() => navigate('/admin/valuation')} 
+                  className="flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-emerald-200"
+                >
+                  <FileText size={16} /> 
+                  <span className="hidden sm:inline">Inventory Report</span>
                 </button>
 
                 <button 
