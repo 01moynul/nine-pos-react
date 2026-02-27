@@ -14,9 +14,9 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ orderId, items, tota
     <div ref={ref} className="hidden print:block p-4 bg-white text-black font-mono text-sm w-[80mm] mx-auto">
       {/* HEADER */}
       <div className="text-center mb-4 border-b border-black pb-2">
-        <h1 className="text-xl font-bold">SIAM GROCERY</h1>
-        <p>123 Market Street, KL</p>
-        <p>Tel: +60 12-345-6789</p>
+        <h1 className="text-xl font-bold">Nine mini mart</h1>
+        <p>A-0-3, PV5 Platinum Hill Condo, Jalan Melati Utama 3, Taman Melati Utama, 53100 Kuala Lumpur</p>
+        <p>Tel: +60 17-847 4356</p>
       </div>
 
       {/* META INFO */}
