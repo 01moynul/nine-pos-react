@@ -98,6 +98,10 @@ export default function StockValuation() {
   // We use a global counter to maintain the S/N across different category tables
   let globalSerialNumber = 1;
 
+// --- FIX: Calculate local YYYY-MM-DD string to bypass UTC timezone drift ---
+  const today = new Date();
+  const maxLocalDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white print:m-0 print:p-0">
       
@@ -118,23 +122,23 @@ export default function StockValuation() {
           <div className="flex items-center gap-4">
             {/* The Date Picker Control */}
             <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-300">
-              <Calendar size={18} className="text-gray-500" />
-              <input
-                type="date"
-                value={targetDate}
-                max={new Date().toISOString().split('T')[0]}
-                onChange={(e) => {
-                  setTargetDate(e.target.value);
-                  // Optional: Auto-clear times if the date is cleared
-                  if (!e.target.value) { setStartTime(''); setEndTime(''); }
-                }}
-                className="border-none outline-none text-sm font-medium text-gray-700 bg-transparent cursor-pointer"
-              />
-              {targetDate && (
-                <button onClick={() => { setTargetDate(''); setStartTime(''); setEndTime(''); }} className="text-red-500 hover:text-red-700 ml-1" title="Clear All">
-                  <X size={16} />
-                </button>
-              )}
+                <Calendar size={18} className="text-gray-500" />
+                <input
+                    type="date"
+                    value={targetDate}
+                    max={maxLocalDate}
+                    onChange={(e) => {
+                    setTargetDate(e.target.value);
+                    // Optional: Auto-clear times if the date is cleared
+                    if (!e.target.value) { setStartTime(''); setEndTime(''); }
+                    }}
+                    className="border-none outline-none text-sm font-medium text-gray-700 bg-transparent cursor-pointer"
+                />
+                {targetDate && (
+                    <button onClick={() => { setTargetDate(''); setStartTime(''); setEndTime(''); }} className="text-red-500 hover:text-red-700 ml-1" title="Clear All">
+                    <X size={16} />
+                    </button>
+                )}
             </div>
 
             {/* NEW: The Time Picker Controls (Only visible if a date is chosen) */}
@@ -254,35 +258,36 @@ export default function StockValuation() {
         {/* --- SIGNATURE BLOCK (Page 41 of PDF) --- */}
         <div className="mt-16 pt-8 border-t-2 border-gray-800 page-break-inside-avoid">
           <h2 className="text-xl font-bold text-gray-900 mb-4 underline uppercase text-center">Stock Verification & Agreement</h2>
+          
           <p className="text-gray-700 mb-8 italic text-center">
-            We confirm that the above stock has been physically counted and mutually agreed by both Seller and Buyer.
+            {t('valuation_confirmation')}
           </p>
           
-          <div className="grid grid-cols-2 gap-16 mt-12">
-            <div className="space-y-8">
-              <div className="border-b border-gray-400 pb-1">
-                <span className="font-bold text-sm text-gray-600">Seller Name:</span>
-              </div>
-              <div className="border-b border-gray-400 pb-1 pt-6">
-                <span className="font-bold text-sm text-gray-600">Signature:</span>
-              </div>
-              <div className="border-b border-gray-400 pb-1 pt-6">
-                <span className="font-bold text-sm text-gray-600">Date:</span>
-              </div>
+            <div className="grid grid-cols-2 gap-16 mt-12">
+                <div className="space-y-8">
+                <div className="border-b border-gray-400 pb-1">
+                    <span className="font-bold text-sm text-gray-600">{t('seller_name')}:</span>
+                </div>
+                <div className="border-b border-gray-400 pb-1 pt-6">
+                    <span className="font-bold text-sm text-gray-600">{t('signature')}:</span>
+                </div>
+                <div className="border-b border-gray-400 pb-1 pt-6">
+                    <span className="font-bold text-sm text-gray-600">{t('date')}:</span>
+                </div>
+                </div>
+                
+                <div className="space-y-8">
+                <div className="border-b border-gray-400 pb-1">
+                    <span className="font-bold text-sm text-gray-600">{t('buyer_name')}:</span>
+                </div>
+                <div className="border-b border-gray-400 pb-1 pt-6">
+                    <span className="font-bold text-sm text-gray-600">{t('signature')}:</span>
+                </div>
+                <div className="border-b border-gray-400 pb-1 pt-6">
+                    <span className="font-bold text-sm text-gray-600">{t('date')}:</span>
+                </div>
+                </div>
             </div>
-            
-            <div className="space-y-8">
-              <div className="border-b border-gray-400 pb-1">
-                <span className="font-bold text-sm text-gray-600">Buyer Name:</span>
-              </div>
-              <div className="border-b border-gray-400 pb-1 pt-6">
-                <span className="font-bold text-sm text-gray-600">Signature:</span>
-              </div>
-              <div className="border-b border-gray-400 pb-1 pt-6">
-                <span className="font-bold text-sm text-gray-600">Date:</span>
-              </div>
-            </div>
-          </div>
         </div>
 
       </div>

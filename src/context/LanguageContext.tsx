@@ -40,6 +40,16 @@ const translations: Translations = {
   total_revenue: { en: 'Total Revenue', ms: 'Jumlah Hasil' },
   total_orders: { en: 'Total Orders', ms: 'Jumlah Pesanan' },
   avg_order_value: { en: 'Avg. Order Value', ms: 'Nilai Pesanan Purata' },
+
+  // --- STOCK VALUATION TRANSLATIONS ---
+  valuation_confirmation: { 
+    en: 'We confirm that the above stock has been physically counted and mutually agreed by both Seller and Buyer.', 
+    ms: 'Kami mengesahkan bahawa stok di atas telah dikira secara fizikal dan dipersetujui bersama oleh Penjual dan Pembeli.' 
+  },
+  seller_name: { en: 'Seller Name', ms: 'Nama Penjual' },
+  buyer_name: { en: 'Buyer Name', ms: 'Nama Pembeli' },
+  signature: { en: 'Signature', ms: 'Tandatangan' },
+  date: { en: 'Date', ms: 'Tarikh' },
   
 };
 

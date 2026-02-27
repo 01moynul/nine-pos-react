@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Pencil, Trash2, Search, X, Save, Upload } from 'lucide-react';
 import type { Product } from '../types';
 import { useLanguage } from '../context/LanguageContext';
+import SmartCategorySelector from '../components/SmartCategorySelector';
 
 export default function AdminProducts() {
   const navigate = useNavigate();
@@ -64,10 +65,10 @@ export default function AdminProducts() {
           interface ApiError { response?: { status: number; }; }
           const apiError = error as ApiError;
           
-          // 3. PRODUCT NOT FOUND (404): Auto-trigger the Rapid Input Form
+         // 3. PRODUCT NOT FOUND (404): Auto-trigger the Rapid Input Form
           if (apiError.response && apiError.response.status === 404) {
             setEditingProduct(null); // Set to "Create Mode"
-            setFormData({ sku: scannedBarcode }); // Auto-fill the scanned SKU
+            setFormData({ sku: scannedBarcode, is_sst_applicable: true }); // Auto-fill SKU and default SST to true
             setIsModalOpen(true); // Pop open the modal
             
             // 4. Snap the keyboard focus directly to the "Product Name" field
@@ -132,7 +133,7 @@ export default function AdminProducts() {
   // --- CLICK HANDLERS ---
   const handleAddClick = () => {
     setEditingProduct(null); // Switch to "Create Mode"
-    setFormData({});         // Clear form
+    setFormData({ is_sst_applicable: true }); // Default SST to true for new items
     setIsModalOpen(true);    // Open Modal
   };
 
@@ -325,18 +326,13 @@ export default function AdminProducts() {
                   />
                 </div>
                 
+                {/* --- SMART CATEGORY COMBOBOX --- */}
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <select 
-                    value={formData.category || 'Food'} 
-                    onChange={e => setFormData({...formData, category: e.target.value})}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                  >
-                     <option value="Food">Food</option>
-                     <option value="Drinks">Drinks</option>
-                     <option value="Dessert">Dessert</option>
-                     <option value="Merch">Merch</option>
-                  </select>
+                  <SmartCategorySelector 
+                    value={formData.category || ''} 
+                    onChange={(val) => setFormData({...formData, category: val})}
+                  />
                 </div>
                 
                 <div>
