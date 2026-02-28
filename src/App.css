@@ -40,3 +40,19 @@
 .read-the-docs {
   color: #888;
 }
+
+/* --- PRINTING SPECIFICS FOR 80MM THERMAL PRINTER --- */
+@media print {
+  @page {
+    /* Force the browser to recognize an 80mm continuous roll */
+    size: 80mm auto; 
+    /* Strip away the default browser margins */
+    margin: 0mm;     
+  }
+  
+  body {
+    /* Ensure the body doesn't add extra padding */
+    margin: 0px;
+    padding: 0px;
+  }
+}

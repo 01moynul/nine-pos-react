@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Printer } from 'lucide-react';
+import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Printer, Monitor } from 'lucide-react';
 import type { Product, CartItem } from '../types';
 import AIAssistant from '../components/AIAssistant';
 import Receipt from '../components/Receipt'; // <--- 1. Import Receipt
@@ -117,6 +117,30 @@ export default function Dashboard() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [API_URL]);
+  // ---------------------------------------------------------
+
+  // --- NEW: DUAL-SCREEN BROADCAST CHANNEL (Action 2.3) ---
+  // This effect runs every time the 'cart' state changes.
+  useEffect(() => {
+    // 1. Initialize the communication channel. Both screens will connect to 'pos_cart_channel'.
+    const channel = new BroadcastChannel('pos_cart_channel');
+    
+    // 2. Pre-calculate the exact totals so the customer screen doesn't have to do the math.
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const sstTax = cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0);
+    const grandTotal = subtotal + sstTax;
+
+    // 3. Broadcast the current state of the order to the Customer Display window.
+    channel.postMessage({
+      items: cart,
+      subtotal: subtotal,
+      sstTax: sstTax,
+      grandTotal: grandTotal
+    });
+
+    // 4. Close the channel connection to prevent memory leaks when the effect cleans up.
+    return () => channel.close();
+  }, [cart]); // Dependency array: ONLY trigger this broadcast when the 'cart' updates.
   // ---------------------------------------------------------
 
   const handleLogout = () => {
@@ -250,6 +274,17 @@ export default function Dashboard() {
                 </button>
               </>
             )}
+
+            {/* --- NEW: CUSTOMER VIEW POP-OUT BUTTON --- */}
+            <button 
+              onClick={() => window.open('/customer-display', '_blank')} 
+              className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-indigo-200 shadow-sm"
+              title="Open Secondary Customer Screen"
+            >
+              <Monitor size={16} /> 
+              <span className="hidden sm:inline">Customer View</span>
+            </button>
+            {/* ----------------------------------------- */}
 
             {/* --- NEW: LANGUAGE TOGGLE BUTTON --- */}
             <button 
@@ -404,10 +439,12 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* --- MOBILE FLOATING CART BUTTON --- */}
       {!isCartOpen && (
         <button 
           onClick={() => setIsCartOpen(true)}
-          className="md:hidden fixed bottom-6 left-6 bg-blue-600 text-white p-4 rounded-full shadow-2xl z-30 flex items-center gap-2 print:hidden"
+          // CHANGED: Replaced 'left-6' with 'right-6' to move it to the bottom right corner
+          className="md:hidden fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-2xl z-30 flex items-center gap-2 print:hidden"
         >
           <ShoppingCart size={24} />
           {cart.length > 0 && (
@@ -417,6 +454,7 @@ export default function Dashboard() {
           )}
         </button>
       )}
+      {/* ----------------------------------- */}
 
       <div className="print:hidden">
          {/* Only Admins get the Superpower */}
