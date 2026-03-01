@@ -52,14 +52,23 @@ export default function AdminProducts() {
         buffer = ''; // Clear buffer immediately for the next scan
 
         const token = localStorage.getItem('token');
-        try {
-          // 1. Query the Go Backend's new Smart Scale Route
+       try {
+          // 1. Query the Go Backend's Smart Scale Route
           const response = await axios.get(`${API_URL}/api/products/scan/${scannedBarcode}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           
-          // 2. PRODUCT EXISTS: Filter the UI to show the scanned item
-          setSearchTerm(response.data.sku || scannedBarcode);
+          // --- BUG FIX: Instant Edit Mode for Existing Products ---
+          const existingProduct = response.data;
+          
+          // Filter the background list for visual clarity
+          setSearchTerm(existingProduct.sku || scannedBarcode); 
+          
+          // Instantly pop open the Edit Modal so they can update stock
+          setEditingProduct(existingProduct); 
+          setFormData({ ...existingProduct }); 
+          setIsModalOpen(true); 
+          // --------------------------------------------------------
           
         } catch (error: unknown) {
           interface ApiError { response?: { status: number; }; }
@@ -204,9 +213,16 @@ export default function AdminProducts() {
     }
   };
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- BUG FIX: Admin Table Search by both Name AND SKU ---
+  const filteredProducts = products.filter(p => {
+    const searchLower = searchTerm.toLowerCase();
+    
+    const matchesName = p.name.toLowerCase().includes(searchLower);
+    const matchesSku = p.sku ? p.sku.toLowerCase().includes(searchLower) : false;
+    
+    return matchesName || matchesSku;
+  });
+  // ---------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">

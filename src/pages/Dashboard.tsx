@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Printer, Monitor } from 'lucide-react';
+// Replace your current lucide-react import with this:
+import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Printer, Monitor, RefreshCw } from 'lucide-react';
 import type { Product, CartItem } from '../types';
 import AIAssistant from '../components/AIAssistant';
 import Receipt from '../components/Receipt'; // <--- 1. Import Receipt
@@ -152,11 +153,24 @@ export default function Dashboard() {
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
+      
       if (existing) {
+        // OVERRIDE PREVENTION: Check if adding 1 more exceeds available stock
+        if (existing.quantity >= product.stock_quantity) {
+          alert(`Cannot add more. Only ${product.stock_quantity} units available.`);
+          return prev; // Cancel the addition, return the cart unchanged
+        }
         return prev.map(item => 
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
+      
+      // Prevent adding the first item if stock is 0
+      if (product.stock_quantity <= 0) {
+        alert(`Sorry, this item is out of stock.`);
+        return prev;
+      }
+      
       return [...prev, { ...product, quantity: 1 }];
     });
   };
@@ -169,6 +183,16 @@ export default function Dashboard() {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
         const newQty = item.quantity + delta;
+        
+        // Find the original product in the main catalog to check its master stock limit
+        const masterProduct = products.find(p => p.id === id);
+        
+        // OVERRIDE PREVENTION: Block if hitting '+' goes over stock
+        if (delta > 0 && masterProduct && newQty > masterProduct.stock_quantity) {
+          alert(`Maximum stock reached. Only ${masterProduct.stock_quantity} available.`);
+          return item; // Keep quantity unchanged
+        }
+        
         return newQty > 0 ? { ...item, quantity: newQty } : item;
       }
       return item;
@@ -216,12 +240,24 @@ export default function Dashboard() {
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const categories = ['All', ...new Set(products.map(p => p.category))];
+  // --- BUG FIX: Dashboard Search (Name + SKU) and Categories ---
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    
+    // Check Name and SKU
+    const matchesName = p.name.toLowerCase().includes(searchLower);
+    const matchesSku = p.sku ? p.sku.toLowerCase().includes(searchLower) : false;
+    
+    // Combine them (it's a match if EITHER name or sku matches)
+    const matchesSearch = matchesName || matchesSku;
+    
+    // Check Category
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    
+    // MUST match both the search string AND the selected category button
     return matchesSearch && matchesCategory;
   });
-
+  // -------------------------------------------------------------
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden relative">
       
@@ -294,6 +330,19 @@ export default function Dashboard() {
             >
               {t('switch_lang')}
             </button>
+
+            {/* --- NEW: HARD RELOAD / CLEAR CACHE BUTTON --- */}
+            <button 
+              onClick={() => {
+                // Force the browser to refresh the page entirely
+                window.location.reload();
+              }} 
+              className="flex items-center gap-2 text-orange-600 hover:text-orange-800 px-2"
+              title="Refresh / Clear Cache"
+            >
+              <RefreshCw size={18} /> <span className="hidden sm:inline">Refresh</span>
+            </button>
+            {/* --------------------------------------------- */}
 
             <button onClick={handleLogout} className="flex items-center gap-2 text-red-600 hover:text-red-800 px-2">
               <LogOut size={18} /> <span className="hidden sm:inline">{t('logout')}</span>

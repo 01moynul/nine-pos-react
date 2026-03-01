@@ -11,12 +11,12 @@ interface ReceiptProps {
 // forwardRef allows the parent (Dashboard) to reference this DOM element for printing
 const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ orderId, items, total, date }, ref) => {
   return (
-    <div ref={ref} className="hidden print:block p-4 bg-white text-black font-mono text-sm w-[80mm] mx-auto">
+    <div ref={ref} className="hidden print:block p-2 bg-white text-black font-mono text-sm w-[72mm] mx-auto">
       {/* HEADER */}
       <div className="text-center mb-4 border-b border-black pb-2">
-        <h1 className="text-xl font-bold">Nine mini mart</h1>
+        <h1 className="text-xl font-bold">REZEKI AL ADEEB ENTERPRISEt</h1>
         <p>A-0-3, PV5 Platinum Hill Condo, Jalan Melati Utama 3, Taman Melati Utama, 53100 Kuala Lumpur</p>
-        <p>Tel: +60 17-847 4356</p>
+        <p>Tel: +60 14-76 46762</p>
       </div>
 
       {/* META INFO */}
