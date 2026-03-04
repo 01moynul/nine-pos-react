@@ -4,12 +4,13 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 // Replace your current lucide-react import with this:
-import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Printer, Monitor, RefreshCw } from 'lucide-react';
+import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Printer, Monitor, RefreshCw, Cloud } from 'lucide-react';
 import type { Product, CartItem } from '../types';
 import AIAssistant from '../components/AIAssistant';
 import Receipt from '../components/Receipt'; // <--- 1. Import Receipt
 import { useLanguage } from '../context/LanguageContext';
 import { FileText } from 'lucide-react';
+
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -322,6 +323,15 @@ export default function Dashboard() {
                   <Settings size={16} /> 
                   <span className="hidden sm:inline">{t('products')}</span>
                 </button>
+                {/* --- NEW: BACKUPS BUTTON --- */}
+                <button 
+                  onClick={() => navigate('/admin/backups')} 
+                  className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-blue-200"
+                >
+                  <Cloud size={16} /> 
+                  <span className="hidden sm:inline">Backups</span>
+                </button>
+                {/* --------------------------- */}
               </>
             )}
 

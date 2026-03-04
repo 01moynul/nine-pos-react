@@ -9,6 +9,7 @@ import AdminProducts from './pages/AdminProducts';
 import SalesReports from './pages/SalesReports';
 import StockValuation from './pages/StockValuation';
 import CustomerDisplay from './pages/CustomerDisplay';
+import BackupManager from './pages/BackupManager';
 
 // Import our new Lockdown UI (We will create this next)
 import Lockdown from './pages/Lockdown';
@@ -47,6 +48,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/admin/products" element={<AdminProducts />} />
         <Route path="/admin/reports" element={<SalesReports />} />
+        <Route path="/admin/backups" element={<BackupManager />} />
         <Route path="/admin/valuation" element={<StockValuation />} />
         {/* 2. ADD THIS NEW ROUTE HERE (Action 2.3) */}
         <Route path="/customer-display" element={<CustomerDisplay />} />
