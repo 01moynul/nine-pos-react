@@ -20,6 +20,9 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isCartOpen, setIsCartOpen] = useState(false);
+  // --- NEW: SECURITY STATE (Task 2.4) ---
+  const [securitySessionId, setSecuritySessionId] = useState<string | null>(null);
+  const prevCartLength = useRef(0);
 
   // --- NEW: PRINTING STATE ---
   const [lastSale, setLastSale] = useState<{ id: number; items: CartItem[]; total: number; date: string } | null>(null);
@@ -52,6 +55,33 @@ export default function Dashboard() {
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  // --- NEW: ANTI-THEFT CAMERA START TRIGGER (Task 2.4) ---
+  useEffect(() => {
+    const initiateSecurityRecording = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.post(`${API_URL}/api/security/start`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data && res.data.session_id) {
+          setSecuritySessionId(res.data.session_id);
+        }
+      } catch (err) {
+        // Fallback: Log error but DO NOT freeze the UI if camera is busy
+        console.error("Security camera start bypassed/failed:", err);
+      }
+    };
+
+    // If the cart just went from 0 to 1 item, start the camera!
+    if (prevCartLength.current === 0 && cart.length > 0) {
+      initiateSecurityRecording();
+    }
+    
+    // Update our tracker for the next render
+    prevCartLength.current = cart.length;
+  }, [cart, API_URL]);
+  // ---------------------------------------------------------
 
   // --- CASHIER SCANNER LISTENER (Milestone 2 - Task 2.3) ---
   useEffect(() => {
@@ -191,6 +221,33 @@ export default function Dashboard() {
   };
 
   const removeFromCart = (id: number) => {
+    const itemToRemove = cart.find(i => i.id === id);
+    if (!itemToRemove) return;
+
+    const isDroppingToZero = cart.length === 1; // Since we are about to remove 1 item
+    const token = localStorage.getItem('token');
+
+    if (isDroppingToZero && securitySessionId) {
+      // TRAP A: Line Void to Zero! (Cashier secretly emptied the cart)
+      const totalValueLost = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      axios.post(`${API_URL}/api/security/stop-void`, {
+        session_id: securitySessionId,
+        reason: "Trash Can Drop to Zero",
+        total_value_lost: totalValueLost,
+        items_in_cart: JSON.stringify(cart)
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      .catch(err => console.error("Failed to log void:", err));
+      
+      setSecuritySessionId(null); // Clear session
+    } else if (securitySessionId) {
+      // TRAP B: Partial Line Void (Cashier deleted one item mid-checkout)
+      axios.post(`${API_URL}/api/security/log-removal`, {
+        session_id: securitySessionId,
+        item_name: itemToRemove.name
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      .catch(err => console.error("Failed to log partial removal:", err));
+    }
+
     setCart(prev => prev.filter(item => item.id !== id));
   };
 
@@ -214,6 +271,27 @@ export default function Dashboard() {
     }));
   };
 
+  // --- NEW: FAST CLEAR ORDER (Task 2.4) ---
+  const handleClearOrder = () => {
+    if (cart.length === 0) return;
+    const token = localStorage.getItem('token');
+    const totalValueLost = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    if (securitySessionId) {
+      axios.post(`${API_URL}/api/security/stop-void`, {
+        session_id: securitySessionId,
+        reason: "Clear Order Button",
+        total_value_lost: totalValueLost,
+        items_in_cart: JSON.stringify(cart)
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      .catch(err => console.error("Failed to log clear order:", err));
+      
+      setSecuritySessionId(null);
+    }
+    setCart([]);
+    setIsCartOpen(false);
+  };
+
   // --- NEW: HANDLING CHECKOUT & PRINTING ---
   const handleCheckout = async () => {
     if (cart.length === 0) return;
@@ -228,6 +306,18 @@ export default function Dashboard() {
       const response = await axios.post(`${API_URL}/api/checkout`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
+
+      // --- NEW: SUCCESS TRIGGER (Task 2.4) ---
+      if (securitySessionId) {
+        axios.post(`${API_URL}/api/security/stop-success`, {
+          session_id: securitySessionId,
+          order_id: response.data.sale_id
+        }, { headers: { Authorization: `Bearer ${token}` } })
+        .catch(err => console.error("Failed to trigger success camera stop:", err));
+        
+        setSecuritySessionId(null); // Clear session
+      }
+      // ---------------------------------------
 
       // 1. Prepare data for the Receipt
       setLastSale({
@@ -491,6 +581,7 @@ export default function Dashboard() {
               <span>{t('subtotal')}</span>
               <span>RM {cartTotal.toFixed(2)}</span>
             </div>
+            
             <div className="flex justify-between text-sm text-gray-600 pb-2">
               <span>{t('sst_tax')}</span>
               <span>RM {cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0).toFixed(2)}</span>
@@ -500,14 +591,25 @@ export default function Dashboard() {
               <span>RM {(cartTotal + cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0)).toFixed(2)}</span>
             </div>
             
-            {/* CHECKOUT BUTTON WITH PRINTER ICON */}
-            <button 
-              onClick={handleCheckout}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              disabled={cart.length === 0}
-            >
-              <Printer size={20} /> {t('pay_print')}
-            </button>
+            {/* --- UPGRADED: CART ACTION BUTTONS (Task 2.4) --- */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleClearOrder}
+                className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 py-3 rounded-lg font-bold shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={cart.length === 0}
+                title="Clear Cart & Log Void"
+              >
+                <Trash2 size={20} /> Clear
+              </button>
+              
+              <button 
+                onClick={handleCheckout}
+                className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={cart.length === 0}
+              >
+                <Printer size={20} /> {t('pay_print')}
+              </button>
+            </div>
           </div>
         </div>
       </div>
