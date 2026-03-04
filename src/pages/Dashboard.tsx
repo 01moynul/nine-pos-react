@@ -85,16 +85,30 @@ export default function Dashboard() {
 
           const scannedProduct = response.data;
 
-          // 2. PRODUCT EXISTS: Drop it instantly into the active cart
+          // 2. PRODUCT EXISTS: Drop it into the cart (WITH FIREWALL)
           setCart(prev => {
             const existing = prev.find(item => item.id === scannedProduct.id);
+            
             if (existing) {
-              // If it's already in the cart, just increase the quantity by 1
+              // OVERRIDE PREVENTION: Check if scanning 1 more exceeds available stock
+              if (existing.quantity >= scannedProduct.stock_quantity) {
+                // Using setTimeout ensures the alert doesn't freeze React's state update cycle
+                setTimeout(() => alert(`Cannot add more. Only ${scannedProduct.stock_quantity} units available.`), 10);
+                return prev; // Cancel the addition, return the cart unchanged
+              }
+              // If stock is available, increase the quantity by 1
               return prev.map(item => 
                 item.id === scannedProduct.id ? { ...item, quantity: item.quantity + 1 } : item
               );
             }
-            // If it's new to the cart, add it with a quantity of 1
+            
+            // Prevent scanning the very first item if stock is already at 0
+            if (scannedProduct.stock_quantity <= 0) {
+              setTimeout(() => alert(`Sorry, this item is out of stock.`), 10);
+              return prev;
+            }
+            
+            // If it's a new item to the cart and in stock, add it
             return [...prev, { ...scannedProduct, quantity: 1 }];
           });
 
