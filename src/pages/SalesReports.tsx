@@ -22,12 +22,22 @@ interface TopSellingItem {
   profit: number; // <-- NEW: From Phase 3
 }
 
+// NEW: Added interface to handle the line items passed from our new GORM Preload
+interface SaleItemData {
+    id: number;
+    product: { name: string };
+    quantity: number;
+    buy_price_rm: number;
+    price_at_sale: number;
+}
+
 interface Sale {
     id: number;
     total_amount: number;
     sale_time: string;
     status: string;
-    security_video_url?: string; // <-- NEW: From Task 2.4 (Optional because older sales might not have it)
+    security_video_url?: string; 
+    items?: SaleItemData[]; // <-- NEW: Contains the cart contents for the receipt and profit math
 }
 
 interface ReportData {
@@ -47,7 +57,20 @@ export default function SalesReports() {
   
   // --- Filter State (Task 3.2) ---
   const [timeframe, setTimeframe] = useState<string>('all'); 
-  const API_URL = import.meta.env.VITE_API_URL; // Always use dynamic environment variable
+  const API_URL = import.meta.env.VITE_API_URL; 
+
+  // --- NEW: State for Digital Receipt Modal ---
+  const [selectedReceipt, setSelectedReceipt] = useState<Sale | null>(null);
+
+  // --- NEW: Helper to calculate exact profit per transaction dynamically ---
+  const calculateSaleProfit = (sale: Sale) => {
+      if (!sale.items || sale.items.length === 0) return 0;
+      return sale.items.reduce((totalProfit, item) => {
+          // Profit = (Sell Price - Buy Price) * Quantity
+          const itemProfit = (item.price_at_sale - item.buy_price_rm) * item.quantity;
+          return totalProfit + itemProfit;
+      }, 0);
+  };
 
   useEffect(() => {
     const fetchFilteredReports = async () => {
@@ -191,138 +214,217 @@ export default function SalesReports() {
             
         </div>
 
-        {/* Top Products Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                    <Package size={20} className="text-gray-500" /> Top Selling Products
-                </h3>
+            {/* Top Products Table */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                        <Package size={20} className="text-gray-500" /> Top Selling Products
+                    </h3>
+                </div>
+                <table className="w-full text-left">
+                    <thead className="bg-white text-gray-500 text-xs uppercase font-semibold">
+                        <tr>
+                            <th className="px-6 py-3">Product Name</th>
+                            <th className="px-6 py-3">Units Sold</th>
+                            <th className="px-6 py-3 text-right">Revenue Generated</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {data.top_selling?.length === 0 ? (
+                            <tr><td colSpan={3} className="p-6 text-center text-gray-400">No sales data yet.</td></tr>
+                        ) : (
+                            data.top_selling?.map((item, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 font-medium text-gray-800">{item.product_name}</td>
+                                    <td className="px-6 py-4 text-gray-600">{item.sold}</td>
+                                    <td className="px-6 py-4 text-right font-mono text-gray-800">{formatMoney(item.revenue)}</td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
             </div>
-            <table className="w-full text-left">
-                <thead className="bg-white text-gray-500 text-xs uppercase font-semibold">
-                    <tr>
-                        <th className="px-6 py-3">Product Name</th>
-                        <th className="px-6 py-3">Units Sold</th>
-                        <th className="px-6 py-3 text-right">Revenue Generated</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                    {data.top_selling?.length === 0 ? (
-                        <tr><td colSpan={3} className="p-6 text-center text-gray-400">No sales data yet.</td></tr>
-                    ) : (
-                        data.top_selling?.map((item, index) => (
-                            <tr key={index} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 font-medium text-gray-800">{item.product_name}</td>
-                                <td className="px-6 py-4 text-gray-600">{item.sold}</td>
-                                <td className="px-6 py-4 text-right font-mono text-gray-800">{formatMoney(item.revenue)}</td>
+
+            {/* --- NEW: Recent Transactions Table --- */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                            <Clock size={20} className="text-gray-500" /> Recent Transactions
+                        </h3>
+                    </div>
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sale ID</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                {/* NEW: Added Net Profit Header */}
+                                <th className="px-6 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider font-bold">Net Profit</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Security Audit</th>
+                                {/* NEW: Action column for the receipt button */}
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                             </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {data.recent_sales?.map((sale) => (
+                                <tr key={sale.id} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{sale.id}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {/* Assuming you have a formatMoney helper, otherwise use your existing amount display */}
+                                        RM {sale.total_amount.toFixed(2)}
+                                    </td>
+                                    {/* NEW: Calculate and display the profit using our new helper */}
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">
+                                        RM {calculateSaleProfit(sale).toFixed(2)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {new Date(sale.sale_time).toLocaleString()}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                            sale.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                        }`}>
+                                            {sale.status}
+                                        </span>
+                                    </td>
+                                    {/* NEW: Smart Security Engine Button (Task 2.4) */}
+                                    <td className="px-6 py-4 text-center">
+                                        {sale.security_video_url ? (
+                                            <a 
+                                                href={getDrivePreviewUrl(sale.security_video_url)} // <--- NEW FIX: Route through our translator
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors text-sm font-medium"
+                                            >
+                                                Watch Video
+                                            </a>
+                                        ) : (
+                                            <span className="text-gray-400 text-sm">No Record</span>
+                                        )}
+                                    </td>
+                                    {/* NEW: Button to trigger the Digital Receipt Modal */}
+                                    <td className="px-6 py-4 text-center">
+                                        <button 
+                                            onClick={() => setSelectedReceipt(sale)}
+                                            className="text-indigo-600 hover:text-indigo-900 text-sm font-medium bg-indigo-50 px-3 py-1 rounded"
+                                        >
+                                            View Receipt
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {data.recent_sales?.length === 0 && (
+                                <tr><td colSpan={4} className="p-6 text-center text-gray-400">No transactions found.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                {/* --- NEW: Security Audit - Voided Transactions (Task 2.4) --- */}
+                <div className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden mt-8">
+                    <div className="px-6 py-4 border-b border-red-100 bg-red-50">
+                        <h3 className="font-bold text-red-800 flex items-center gap-2">
+                            <Clock size={20} className="text-red-500" /> Security Audit: Voided & Canceled Carts
+                        </h3>
+                    </div>
+                    <table className="w-full text-left">
+                    <thead className="bg-white text-gray-500 text-xs uppercase font-semibold">
+                            <tr>
+                                <th className="px-6 py-3">Time</th>
+                                <th className="px-6 py-3">Reason</th>
+                                <th className="px-6 py-3 text-right">Value Lost</th>
+                                <th className="px-6 py-3 text-center">Security Video</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-red-50">
+                            {data.voided_sales?.map((voided) => (
+                                <tr key={voided.id} className="hover:bg-red-50/50">
+                                    <td className="px-6 py-4 text-gray-800">{formatDate(voided.timestamp)}</td>
+                                    <td className="px-6 py-4 font-medium text-red-600">{voided.reason}</td>
+                                    <td className="px-6 py-4 text-right font-bold text-gray-800">
+                                        {formatMoney(voided.total_value_lost)}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        {voided.security_video_url && !voided.security_video_url.includes("PENDING_UPLOAD") ? (
+                                            <a 
+                                                href={getDrivePreviewUrl(voided.security_video_url)} // <--- NEW FIX: Route through our translator
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors text-sm font-bold shadow-sm"
+                                            >
+                                                Watch Audit
+                                            </a>
+                                        ) : (
+                                            <span className="text-gray-400 text-sm">Processing...</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                            {data.voided_sales?.length === 0 && (
+                                <tr><td colSpan={4} className="p-6 text-center text-gray-400">No voided transactions found. Excellent!</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+        </div>
+      {/* --- NEW: Digital Receipt Modal --- */}
+      {/* If selectedReceipt has data, we render this full-screen overlay */}
+      {selectedReceipt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 relative">
+                
+                {/* Close Button */}
+                <button 
+                    onClick={() => setSelectedReceipt(null)}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-700"
+                >
+                    ✕
+                </button>
+
+                {/* Receipt Header */}
+                <div className="text-center border-b pb-4 mb-4">
+                    <h2 className="text-2xl font-bold text-gray-800">Nine-POS</h2>
+                    <p className="text-sm text-gray-500">Digital Receipt</p>
+                    <p className="text-xs text-gray-400 mt-1">Transaction #{selectedReceipt.id}</p>
+                    <p className="text-xs text-gray-400">{new Date(selectedReceipt.sale_time).toLocaleString()}</p>
+                </div>
+
+                {/* Receipt Line Items */}
+                <div className="space-y-3 mb-6">
+                    {selectedReceipt.items && selectedReceipt.items.length > 0 ? (
+                        selectedReceipt.items.map((item, index) => (
+                            <div key={index} className="flex justify-between text-sm">
+                                <div className="flex-1">
+                                    <p className="font-medium text-gray-800">{item.product.name}</p>
+                                    <p className="text-xs text-gray-500">{item.quantity}x @ RM {item.price_at_sale.toFixed(2)}</p>
+                                </div>
+                                <div className="font-medium text-gray-800">
+                                    RM {(item.quantity * item.price_at_sale).toFixed(2)}
+                                </div>
+                            </div>
                         ))
+                    ) : (
+                        <p className="text-sm text-gray-500 italic text-center">No item details available for this legacy transaction.</p>
                     )}
-                </tbody>
-            </table>
-        </div>
+                </div>
 
-        {/* --- NEW: Recent Transactions Table --- */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                    <Clock size={20} className="text-gray-500" /> Recent Transactions
-                </h3>
-            </div>
-            <table className="w-full text-left">
-                <thead className="bg-white text-gray-500 text-xs uppercase font-semibold">
-                    <tr>
-                        <th className="px-6 py-3">ID</th>
-                        <th className="px-6 py-3">Date & Time</th>
-                        <th className="px-6 py-3">Status</th>
-                        <th className="px-6 py-3 text-right">Total</th>
-                        <th className="px-6 py-3 text-center">Security Audit</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                    {data.recent_sales?.map((sale) => (
-                        <tr key={sale.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 font-mono text-gray-500">#{sale.id}</td>
-                            <td className="px-6 py-4 text-gray-800">{formatDate(sale.sale_time)}</td>
-                            <td className="px-6 py-4">
-                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase">
-                                    {sale.status}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 text-right font-bold text-gray-800">
-                                {formatMoney(sale.total_amount)}
-                            </td>
-                            {/* NEW: Smart Security Engine Button (Task 2.4) */}
-                            <td className="px-6 py-4 text-center">
-                                {sale.security_video_url ? (
-                                    <a 
-                                        href={getDrivePreviewUrl(sale.security_video_url)} // <--- NEW FIX: Route through our translator
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors text-sm font-medium"
-                                    >
-                                        Watch Video
-                                    </a>
-                                ) : (
-                                    <span className="text-gray-400 text-sm">No Record</span>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                    {data.recent_sales?.length === 0 && (
-                         <tr><td colSpan={4} className="p-6 text-center text-gray-400">No transactions found.</td></tr>
-                    )}
-                </tbody>
-            </table>
-            {/* --- NEW: Security Audit - Voided Transactions (Task 2.4) --- */}
-        <div className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden mt-8">
-            <div className="px-6 py-4 border-b border-red-100 bg-red-50">
-                <h3 className="font-bold text-red-800 flex items-center gap-2">
-                    <Clock size={20} className="text-red-500" /> Security Audit: Voided & Canceled Carts
-                </h3>
-            </div>
-            <table className="w-full text-left">
-               <thead className="bg-white text-gray-500 text-xs uppercase font-semibold">
-                    <tr>
-                        <th className="px-6 py-3">Time</th>
-                        <th className="px-6 py-3">Reason</th>
-                        <th className="px-6 py-3 text-right">Value Lost</th>
-                        <th className="px-6 py-3 text-center">Security Video</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-red-50">
-                    {data.voided_sales?.map((voided) => (
-                        <tr key={voided.id} className="hover:bg-red-50/50">
-                            <td className="px-6 py-4 text-gray-800">{formatDate(voided.timestamp)}</td>
-                            <td className="px-6 py-4 font-medium text-red-600">{voided.reason}</td>
-                            <td className="px-6 py-4 text-right font-bold text-gray-800">
-                                {formatMoney(voided.total_value_lost)}
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                                {voided.security_video_url && !voided.security_video_url.includes("PENDING_UPLOAD") ? (
-                                    <a 
-                                        href={getDrivePreviewUrl(voided.security_video_url)} // <--- NEW FIX: Route through our translator
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors text-sm font-bold shadow-sm"
-                                    >
-                                        Watch Audit
-                                    </a>
-                                ) : (
-                                    <span className="text-gray-400 text-sm">Processing...</span>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                    {data.voided_sales?.length === 0 && (
-                         <tr><td colSpan={4} className="p-6 text-center text-gray-400">No voided transactions found. Excellent!</td></tr>
-                    )}
-                </tbody>
-            </table>
-        </div>
-        </div>
+                {/* Receipt Totals */}
+                <div className="border-t pt-4 space-y-2">
+                    <div className="flex justify-between font-bold text-lg">
+                        <span>Total</span>
+                        <span>RM {selectedReceipt.total_amount.toFixed(2)}</span>
+                    </div>
+                    {/* Management Only: Show the hidden profit on the receipt */}
+                    <div className="flex justify-between text-sm text-green-600 font-medium">
+                        <span>Net Profit</span>
+                        <span>RM {calculateSaleProfit(selectedReceipt).toFixed(2)}</span>
+                    </div>
+                </div>
 
-      </div>
-    </div>
+            </div>
+        </div>
+      )}
+
+    </div> // Final closing div of the SalesReports component
   );
 }
