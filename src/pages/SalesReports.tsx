@@ -59,7 +59,11 @@ export default function SalesReports() {
   const [timeframe, setTimeframe] = useState<string>('all'); 
   const API_URL = import.meta.env.VITE_API_URL; 
 
-  // --- NEW: State for Digital Receipt Modal ---
+  // --- NEW: Custom Date/Time State ---
+  const [customStart, setCustomStart] = useState<string>('');
+  const [customEnd, setCustomEnd] = useState<string>('');
+
+  // --- State for Digital Receipt Modal ---
   const [selectedReceipt, setSelectedReceipt] = useState<Sale | null>(null);
 
   // --- NEW: Helper to calculate exact profit per transaction dynamically ---
@@ -77,20 +81,26 @@ export default function SalesReports() {
       setLoading(true);
       try {
         const token = localStorage.getItem('token'); 
-        // Dynamically applies the URL and the Timeframe filter
-        const response = await axios.get(`${API_URL}/api/reports?timeframe=${timeframe}`, {
+        
+        // NEW: Dynamically build the URL depending on the timeframe choice
+        let url = `${API_URL}/api/reports?timeframe=${timeframe}`;
+        if (timeframe === 'custom' && customStart && customEnd) {
+            url += `&customStart=${customStart}&customEnd=${customEnd}`;
+        }
+
+        const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setData(response.data);
       } catch (error) {
-        console.error("Failed to fetch reports:", error); // Satisfies linter requirements
+        console.error("Failed to fetch reports:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchFilteredReports();
-  }, [timeframe, API_URL]); // Only re-runs when the timeframe button is clicked
+  }, [timeframe, customStart, customEnd, API_URL]); // <-- NEW: Added customStart and customEnd to dependencies
 
   // Format Money: RM 1,234.56
   const formatMoney = (amount: number) => {
@@ -143,35 +153,39 @@ export default function SalesReports() {
                 <p className="text-sm text-gray-500">{t('real_time_metrics')}</p>
             </div>
             </div>
-        {/* --- NEW: Advanced Filtering UI (Task 3.2) --- */}
-        <div className="flex flex-wrap items-center gap-2 mb-6 bg-white p-2 rounded-xl shadow-sm border border-gray-100 inline-flex">
-            <span className="text-sm font-semibold text-gray-500 ml-2 mr-2">Filter By:</span>
-            
-            <button 
-                onClick={() => setTimeframe('today')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'today' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-            >
-                Today
-            </button>
-            <button 
-                onClick={() => setTimeframe('7days')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === '7days' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-            >
-                7 Days
-            </button>
-            <button 
-                onClick={() => setTimeframe('30days')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === '30days' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-            >
-                30 Days
-            </button>
-            <button 
-                onClick={() => setTimeframe('all')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-            >
-                All Time
-            </button>
-        </div>
+            {/* --- Advanced Filtering UI (Task 3.2) --- */}
+            <div className="flex flex-wrap items-center gap-2 mb-6 bg-white p-2 rounded-xl shadow-sm border border-gray-100 inline-flex">
+                <span className="text-sm font-semibold text-gray-500 ml-2 mr-2">Filter By:</span>
+                
+                <button onClick={() => setTimeframe('today')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'today' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>Today</button>
+                <button onClick={() => setTimeframe('7days')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === '7days' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>7 Days</button>
+                <button onClick={() => setTimeframe('30days')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === '30days' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>30 Days</button>
+                <button onClick={() => setTimeframe('all')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>All Time</button>
+                
+                {/* NEW: Custom Timeframe Trigger */}
+                <button onClick={() => setTimeframe('custom')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'custom' ? 'bg-indigo-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>
+                    Custom Shift
+                </button>
+
+                {/* NEW: The Date/Time Pickers (Only visible when 'Custom Shift' is active) */}
+                {timeframe === 'custom' && (
+                    <div className="flex items-center gap-2 ml-4 border-l pl-4 border-gray-200">
+                        <input 
+                            type="datetime-local" 
+                            value={customStart} 
+                            onChange={(e) => setCustomStart(e.target.value)} 
+                            className="text-sm border border-gray-300 rounded p-1.5 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                        />
+                        <span className="text-sm font-medium text-gray-400">to</span>
+                        <input 
+                            type="datetime-local" 
+                            value={customEnd} 
+                            onChange={(e) => setCustomEnd(e.target.value)} 
+                            className="text-sm border border-gray-300 rounded p-1.5 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                        />
+                    </div>
+                )}
+            </div>
         
         {/* KPI Cards (Now merged into a 4-column grid!) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -383,7 +397,7 @@ export default function SalesReports() {
 
                 {/* Receipt Header */}
                 <div className="text-center border-b pb-4 mb-4">
-                    <h2 className="text-2xl font-bold text-gray-800">Nine-POS</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">REZEKI AL ADEEB ENTERPRISEt</h2>
                     <p className="text-sm text-gray-500">Digital Receipt</p>
                     <p className="text-xs text-gray-400 mt-1">Transaction #{selectedReceipt.id}</p>
                     <p className="text-xs text-gray-400">{new Date(selectedReceipt.sale_time).toLocaleString()}</p>
