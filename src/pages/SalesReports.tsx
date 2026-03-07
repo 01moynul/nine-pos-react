@@ -57,7 +57,8 @@ export default function SalesReports() {
   
   // --- Filter State (Task 3.2) ---
   const [timeframe, setTimeframe] = useState<string>('all'); 
-  const API_URL = import.meta.env.VITE_API_URL; 
+  const [searchQuery, setSearchQuery] = useState<string>(''); // NEW: Item Search State
+  const API_URL = import.meta.env.VITE_API_URL;
 
   // --- NEW: Custom Date/Time State ---
   const [customStart, setCustomStart] = useState<string>('');
@@ -87,6 +88,10 @@ export default function SalesReports() {
         if (timeframe === 'custom' && customStart && customEnd) {
             url += `&customStart=${customStart}&customEnd=${customEnd}`;
         }
+        // NEW: Append the item search query if it exists
+        if (searchQuery) {
+            url += `&search=${encodeURIComponent(searchQuery)}`;
+        }
 
         const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` }
@@ -100,8 +105,7 @@ export default function SalesReports() {
     };
 
     fetchFilteredReports();
-  }, [timeframe, customStart, customEnd, API_URL]); // <-- NEW: Added customStart and customEnd to dependencies
-
+  }, [timeframe, customStart, customEnd, searchQuery, API_URL]); // <-- NEW: Added searchQuery
   // Format Money: RM 1,234.56
   const formatMoney = (amount: number) => {
     const safeAmount = amount || 0; 
@@ -131,7 +135,9 @@ export default function SalesReports() {
     return url; // Fallback just in case
   };
 
-  if (loading) {
+  // FIX: Only show the full-page loading screen if we have absolutely no data yet.
+  // This prevents the search bar from being destroyed and losing focus while typing!
+  if (loading && !data) {
       return <div className="p-8 flex justify-center text-gray-500">Loading analytics...</div>;
   }
 
@@ -154,37 +160,58 @@ export default function SalesReports() {
             </div>
             </div>
             {/* --- Advanced Filtering UI (Task 3.2) --- */}
-            <div className="flex flex-wrap items-center gap-2 mb-6 bg-white p-2 rounded-xl shadow-sm border border-gray-100 inline-flex">
-                <span className="text-sm font-semibold text-gray-500 ml-2 mr-2">Filter By:</span>
-                
-                <button onClick={() => setTimeframe('today')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'today' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>Today</button>
-                <button onClick={() => setTimeframe('7days')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === '7days' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>7 Days</button>
-                <button onClick={() => setTimeframe('30days')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === '30days' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>30 Days</button>
-                <button onClick={() => setTimeframe('all')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>All Time</button>
-                
-                {/* NEW: Custom Timeframe Trigger */}
-                <button onClick={() => setTimeframe('custom')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'custom' ? 'bg-indigo-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>
-                    Custom Shift
-                </button>
+            <div className="flex flex-wrap items-center gap-2 mb-6 bg-white p-2 rounded-xl shadow-sm border border-gray-100 w-full justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-500 ml-2 mr-2">Filter By:</span>
+                    
+                    <button onClick={() => setTimeframe('today')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'today' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>Today</button>
+                    <button onClick={() => setTimeframe('7days')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === '7days' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>7 Days</button>
+                    <button onClick={() => setTimeframe('30days')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === '30days' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>30 Days</button>
+                    <button onClick={() => setTimeframe('all')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>All Time</button>
+                    
+                    {/* NEW: Custom Timeframe Trigger */}
+                    <button onClick={() => setTimeframe('custom')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${timeframe === 'custom' ? 'bg-indigo-600 text-white shadow-md' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}>
+                        Custom Shift
+                    </button>
 
-                {/* NEW: The Date/Time Pickers (Only visible when 'Custom Shift' is active) */}
-                {timeframe === 'custom' && (
-                    <div className="flex items-center gap-2 ml-4 border-l pl-4 border-gray-200">
-                        <input 
-                            type="datetime-local" 
-                            value={customStart} 
-                            onChange={(e) => setCustomStart(e.target.value)} 
-                            className="text-sm border border-gray-300 rounded p-1.5 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                        />
-                        <span className="text-sm font-medium text-gray-400">to</span>
-                        <input 
-                            type="datetime-local" 
-                            value={customEnd} 
-                            onChange={(e) => setCustomEnd(e.target.value)} 
-                            className="text-sm border border-gray-300 rounded p-1.5 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                        />
-                    </div>
-                )}
+                    {/* NEW: The Date/Time Pickers (Only visible when 'Custom Shift' is active) */}
+                    {timeframe === 'custom' && (
+                        <div className="flex items-center gap-2 ml-4 border-l pl-4 border-gray-200">
+                            <input 
+                                type="datetime-local" 
+                                value={customStart} 
+                                onChange={(e) => setCustomStart(e.target.value)} 
+                                className="text-sm border border-gray-300 rounded p-1.5 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                            />
+                            <span className="text-sm font-medium text-gray-400">to</span>
+                            <input 
+                                type="datetime-local" 
+                                value={customEnd} 
+                                onChange={(e) => setCustomEnd(e.target.value)} 
+                                className="text-sm border border-gray-300 rounded p-1.5 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* NEW: Item Specific Search Bar */}
+                <div className="flex items-center">
+                    <input
+                        type="text"
+                        placeholder="Search Product or SKU..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-inner"
+                    />
+                    {searchQuery && (
+                        <button 
+                            onClick={() => setSearchQuery('')}
+                            className="ml-2 text-gray-400 hover:text-red-500 text-sm font-bold"
+                        >
+                            Clear
+                        </button>
+                    )}
+                </div>
             </div>
         
         {/* KPI Cards (Now merged into a 4-column grid!) */}

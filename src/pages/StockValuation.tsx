@@ -13,17 +13,22 @@ interface ValuationItem {
   quantity: number;
   cost_price: number;
   total_cost: number;
+  sell_price: number;      // NEW
+  profit_per_unit: number; // NEW
+  total_profit: number;    // NEW
 }
 
 interface CategoryGroup {
   category_name: string;
   items: ValuationItem[];
   subtotal: number;
+  profit_subtotal: number; // NEW
 }
 
 interface ValuationResponse {
   categories: CategoryGroup[];
   grand_total: number;
+  grand_total_profit: number; // NEW
 }
 
 export default function StockValuation() {
@@ -32,9 +37,11 @@ export default function StockValuation() {
   const [loading, setLoading] = useState(true);
   const [targetDate, setTargetDate] = useState<string>(''); // NEW: Tracks the selected history date
 
-  // --- NEW: Time Filter State ---
   const [startTime, setStartTime] = useState<string>('');
   const [endTime, setEndTime] = useState<string>('');
+  
+  // NEW: State for the Profitability View toggle
+  const [showProfit, setShowProfit] = useState<boolean>(false);
 
   const { t } = useLanguage();
 
@@ -168,6 +175,17 @@ export default function StockValuation() {
               </div>
             )}
 
+            {/* NEW: Profitability Toggle */}
+            <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-300 print:hidden">
+              <input 
+                type="checkbox" 
+                checked={showProfit} 
+                onChange={(e) => setShowProfit(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+              <span className="text-sm font-bold text-gray-700">Show Profit</span>
+            </label>
+
             <button 
               onClick={() => window.print()} 
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-colors disabled:opacity-50"
@@ -216,7 +234,10 @@ export default function StockValuation() {
                     <th className="p-2 border border-gray-300 text-sm">Item Name</th>
                     <th className="p-2 border border-gray-300 w-24 text-center text-sm">Qty</th>
                     <th className="p-2 border border-gray-300 w-32 text-right text-sm">Billing Price</th>
+                    {showProfit && <th className="p-2 border border-gray-300 w-32 text-right text-sm text-green-700 bg-green-50 print:bg-transparent">Sell Price</th>}
+                    {showProfit && <th className="p-2 border border-gray-300 w-32 text-right text-sm text-green-700 bg-green-50 print:bg-transparent">Profit/Unit</th>}
                     <th className="p-2 border border-gray-300 w-32 text-right text-sm">Total Cost</th>
+                    {showProfit && <th className="p-2 border border-gray-300 w-32 text-right text-sm text-green-700 bg-green-50 print:bg-transparent">Total Profit</th>}
                   </tr>
                 </thead>
                 <tbody className="text-sm">
@@ -228,18 +249,26 @@ export default function StockValuation() {
                         <td className="p-2 border border-gray-300 font-medium text-gray-900">{item.name}</td>
                         <td className="p-2 border border-gray-300 text-center text-gray-800 font-bold">{item.quantity}</td>
                         <td className="p-2 border border-gray-300 text-right text-gray-600 font-mono">{formatMoney(item.cost_price)}</td>
+                        {showProfit && <td className="p-2 border border-gray-300 text-right text-green-700 font-mono bg-green-50 print:bg-transparent">{formatMoney(item.sell_price)}</td>}
+                        {showProfit && <td className="p-2 border border-gray-300 text-right text-green-700 font-mono bg-green-50 print:bg-transparent">{formatMoney(item.profit_per_unit)}</td>}
                         <td className="p-2 border border-gray-300 text-right font-bold text-gray-900 font-mono">{formatMoney(item.total_cost)}</td>
+                        {showProfit && <td className="p-2 border border-gray-300 text-right font-bold text-green-700 font-mono bg-green-50 print:bg-transparent">{formatMoney(item.total_profit)}</td>}
                       </tr>
                     );
                   })}
                   {/* Category Subtotal Row */}
                   <tr className="bg-gray-50 print:bg-gray-100 border-t-2 border-gray-400">
-                    <td colSpan={4} className="p-2 border border-gray-300 text-right font-bold text-gray-800">
+                    <td colSpan={showProfit ? 6 : 4} className="p-2 border border-gray-300 text-right font-bold text-gray-800">
                       {group.category_name} Subtotal:
                     </td>
                     <td className="p-2 border border-gray-300 text-right font-bold text-blue-800 font-mono print:text-black">
                       {formatMoney(group.subtotal)}
                     </td>
+                    {showProfit && (
+                      <td className="p-2 border border-gray-300 text-right font-bold text-green-700 font-mono bg-green-100 print:bg-transparent">
+                        {formatMoney(group.profit_subtotal)}
+                      </td>
+                    )}
                   </tr>
                 </tbody>
               </table>
@@ -249,10 +278,22 @@ export default function StockValuation() {
 
         {/* Grand Total Block */}
         <div className="mt-8 mb-16 p-6 border-4 border-gray-800 bg-gray-50 print:bg-transparent flex justify-between items-center page-break-inside-avoid">
-          <h2 className="text-2xl font-bold text-gray-800 uppercase">Grand Total Valuation</h2>
-          <span className="text-3xl font-black text-blue-700 font-mono print:text-black">
-            {formatMoney(data.grand_total)}
-          </span>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 uppercase">Grand Total Valuation</h2>
+            {showProfit && (
+              <h3 className="text-xl font-bold text-green-700 uppercase mt-2">Projected Total Profit</h3>
+            )}
+          </div>
+          <div className="text-right">
+            <div className="text-3xl font-black text-blue-700 font-mono print:text-black">
+              {formatMoney(data.grand_total)}
+            </div>
+            {showProfit && (
+              <div className="text-2xl font-black text-green-700 font-mono mt-2 print:text-black">
+                {formatMoney(data.grand_total_profit)}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* --- SIGNATURE BLOCK (Page 41 of PDF) --- */}

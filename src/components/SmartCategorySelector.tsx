@@ -1,7 +1,7 @@
 // src/components/SmartCategorySelector.tsx
 
 import { useState, useRef, useEffect } from 'react';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, Plus } from 'lucide-react';
 import { POS_CATEGORIES } from '../utils/categories';
 
 // Define the properties this component needs to receive from the parent
@@ -26,14 +26,20 @@ export default function SmartCategorySelector({ value, onChange }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // --- LOGIC: The Search Engine (Path B) ---
-  // We filter the categories based on what the user types into the input box.
+ // --- LOGIC: The Search Engine (Path B) ---
   const filteredCategories = POS_CATEGORIES.map(group => ({
     ...group,
     items: group.items.filter(item =>
       item.toLowerCase().includes(searchTerm.toLowerCase())
     )
   })).filter(group => group.items.length > 0); // Hide empty parent groups
+
+  // NEW LOGIC: Determine if we should show the "Create New" button
+  const trimmedSearch = searchTerm.trim();
+  const exactMatchFound = POS_CATEGORIES.some(group => 
+    group.items.some(item => item.toLowerCase() === trimmedSearch.toLowerCase())
+  );
+  const showCreateOption = trimmedSearch.length > 0 && !exactMatchFound;
 
   return (
     <div ref={wrapperRef} className="relative w-full">
@@ -57,10 +63,27 @@ export default function SmartCategorySelector({ value, onChange }: Props) {
         <ChevronDown className="w-5 h-5 text-gray-500 absolute right-3 pointer-events-none" />
       </div>
 
-      {/* --- VISUAL: The Dropdown Menu (Path A) --- */}
+      {/* --- VISUAL: The Dropdown Menu (Path A & Path C) --- */}
       {isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-          {filteredCategories.length === 0 ? (
+          
+          {/* NEW (Path C): The Creatable Option */}
+          {showCreateOption && (
+            <div
+              className="px-4 py-3 text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 cursor-pointer flex items-center border-b border-blue-100 transition-colors"
+              onClick={() => {
+                onChange(trimmedSearch); // Send the custom text to the parent
+                setSearchTerm('');       // Clear search
+                setIsOpen(false);        // Close menu
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create "{trimmedSearch}"
+            </div>
+          )}
+
+          {/* Existing Filtered List (Path A) */}
+          {filteredCategories.length === 0 && !showCreateOption ? (
             <div className="p-3 text-sm text-gray-500 text-center">No categories found.</div>
           ) : (
             filteredCategories.map((group, groupIdx) => (
@@ -75,9 +98,9 @@ export default function SmartCategorySelector({ value, onChange }: Props) {
                     key={itemIdx}
                     className="px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer transition-colors"
                     onClick={() => {
-                      onChange(item); // Update the React state in the parent
-                      setSearchTerm(''); // Clear the search
-                      setIsOpen(false); // Close the menu
+                      onChange(item); 
+                      setSearchTerm(''); 
+                      setIsOpen(false); 
                     }}
                   >
                     {item}
