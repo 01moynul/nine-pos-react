@@ -10,6 +10,7 @@ export interface Product {
   stock_quantity: number;      // Available stock
   stock_reserved: number;      // Omnichannel hold stock
   is_sst_applicable: boolean;  // Tax flag
+  is_weighable?: boolean;      // NEW: Scale Integration flag
   image_url?: string;
 }
 

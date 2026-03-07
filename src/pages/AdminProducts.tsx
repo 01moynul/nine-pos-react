@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, type ChangeEvent } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil, Trash2, Search, X, Save, Upload } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, Search, X, Save, Upload, Download } from 'lucide-react';
 import type { Product } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import SmartCategorySelector from '../components/SmartCategorySelector';
@@ -177,6 +177,24 @@ export default function AdminProducts() {
     }
   };
 
+  // --- NEW: SMART PLU GENERATOR FOR HARDWARE SCALES ---
+  const generateNextPLU = () => {
+    // 1. Find all products that are weighable and have a strictly numeric SKU
+    const weighableProducts = products.filter(p => 
+      p.is_weighable && p.sku && !isNaN(Number(p.sku))
+    );
+    
+    // 2. If this is the very first weighable product, start at 1
+    if (weighableProducts.length === 0) return '00001';
+    
+    // 3. Find the highest existing PLU number
+    const maxPLU = Math.max(...weighableProducts.map(p => Number(p.sku)));
+    
+    // 4. Calculate the next number and pad it with zeros to ensure 5 digits
+    const nextPLU = maxPLU + 1;
+    return String(nextPLU).padStart(5, '0');
+  };
+
   const handleSave = async () => {
     const token = localStorage.getItem('token');
 
@@ -213,6 +231,35 @@ export default function AdminProducts() {
     }
   };
 
+  const handleExportScale = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      // 1. Fetch the file using axios so we can inject the Auth header securely
+      const response = await axios.get(`${API_URL}/api/products/scale-export`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob', // CRITICAL: Tells axios we expect a file, not JSON text
+      });
+
+      // 2. Create a temporary URL for the downloaded data blob
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      
+      // 3. Create a hidden HTML link, click it automatically, and destroy it
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'rongta_plu_export.csv'); // Force the filename
+      document.body.appendChild(link);
+      link.click();
+
+      // 4. Cleanup memory
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error("Export failed", error);
+      alert("Failed to export scale data. Ensure you have Admin privileges.");
+    }
+  };
+
   // --- BUG FIX: Admin Table Search by both Name AND SKU ---
   const filteredProducts = products.filter(p => {
     const searchLower = searchTerm.toLowerCase();
@@ -234,10 +281,19 @@ export default function AdminProducts() {
           </button>
           <h1 className="text-2xl font-bold text-gray-800">{t('inventory_mgmt')}</h1>
         </div>
-        {/* ADD BUTTON NOW CONNECTED */}
-        <button onClick={handleAddClick} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-md">
-          <Plus size={20} /> {t('add_product')}
-        </button>
+        
+        {/* NEW: Added Export Button next to Add Button */}
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handleExportScale} // <-- UPDATED to use our new secure blob function
+            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-emerald-700 shadow-md transition-colors"
+          >
+            <Download size={20} /> Export to Scale
+          </button>
+          <button onClick={handleAddClick} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-md transition-colors">
+            <Plus size={20} /> {t('add_product')}
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -284,9 +340,14 @@ export default function AdminProducts() {
                 <td className="p-4 font-mono text-sm text-gray-600">
                   <span className="text-red-500">{product.cost_price?.toFixed(2) || '0.00'}</span> / <span className="text-green-600 font-bold">{product.price?.toFixed(2) || '0.00'}</span>
                 </td>
+                {/* --- FORMAT: Smart decimals for Exact Inventory Display --- */}
                 <td className="p-4 text-sm">
-                   <span className={`font-bold ${product.stock_quantity < 10 ? 'text-red-500' : 'text-green-600'}`}>{product.stock_quantity}</span> 
-                   <span className="text-gray-400 ml-1">({product.stock_reserved || 0})</span>
+                   <span className={`font-bold ${product.stock_quantity < 10 ? 'text-red-500' : 'text-green-600'}`}>
+                     {product.is_weighable ? Number(product.stock_quantity.toFixed(3)) : product.stock_quantity}
+                   </span> 
+                   <span className="text-gray-400 ml-1">
+                     ({product.is_weighable ? Number((product.stock_reserved || 0).toFixed(3)) : (product.stock_reserved || 0)})
+                   </span>
                 </td>
                 <td className="p-4">
                    {product.is_sst_applicable ? <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Yes</span> : <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">No</span>}
@@ -372,34 +433,67 @@ export default function AdminProducts() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Available Stock</label>
+                  {/* --- BUG FIX: parseFloat allows fractional input, step="any" allows browser decimals --- */}
                   <input 
                     type="number" 
+                    step="any"
                     value={formData.stock_quantity || 0} 
-                    onChange={e => setFormData({...formData, stock_quantity: parseInt(e.target.value)})}
+                    onChange={e => setFormData({...formData, stock_quantity: parseFloat(e.target.value) || 0})}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Reserved Stock</label>
+                  {/* --- BUG FIX: parseFloat and step="any" --- */}
                   <input 
                     type="number" 
+                    step="any"
                     value={formData.stock_reserved || 0} 
-                    onChange={e => setFormData({...formData, stock_reserved: parseInt(e.target.value)})}
+                    onChange={e => setFormData({...formData, stock_reserved: parseFloat(e.target.value) || 0})}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
                   />
                 </div>
                 
-                <div className="col-span-2 flex items-center gap-2 mt-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
-                  <input 
-                    type="checkbox" 
-                    id="sst_checkbox"
-                    checked={formData.is_sst_applicable || false} 
-                    onChange={e => setFormData({...formData, is_sst_applicable: e.target.checked})}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="sst_checkbox" className="text-sm font-medium text-gray-800 cursor-pointer">
-                    Apply 6% SST to this item
-                  </label>
+                {/* --- TOGGLES --- */}
+                <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                  <div className="flex items-center gap-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <input 
+                      type="checkbox" 
+                      id="sst_checkbox"
+                      checked={formData.is_sst_applicable || false} 
+                      onChange={e => setFormData({...formData, is_sst_applicable: e.target.checked})}
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <label htmlFor="sst_checkbox" className="text-sm font-medium text-gray-800 cursor-pointer">
+                      Apply 6% SST to this item
+                    </label>
+                  </div>
+
+                  {/* NEW: Scale Weighable Toggle */}
+                  {/* --- UPDATED: Scale Weighable Toggle with Auto-PLU --- */}
+                  <div className="flex items-center gap-2 bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                    <input 
+                      type="checkbox" 
+                      id="weighable_checkbox"
+                      checked={formData.is_weighable || false} 
+                      onChange={e => {
+                        const isNowWeighable = e.target.checked;
+                        setFormData(prev => {
+                          const newData = { ...prev, is_weighable: isNowWeighable };
+                          
+                          // If turning ON and the SKU is empty (or non-numeric), auto-generate a valid PLU
+                          if (isNowWeighable && (!prev.sku || isNaN(Number(prev.sku)))) {
+                             newData.sku = generateNextPLU();
+                          }
+                          return newData;
+                        });
+                      }}
+                      className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <label htmlFor="weighable_checkbox" className="text-sm font-medium text-gray-800 cursor-pointer">
+                      Is Weighable (For Scale)
+                    </label>
+                  </div>
                 </div>
               </div>
 

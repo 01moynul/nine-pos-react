@@ -10,12 +10,17 @@ import AIAssistant from '../components/AIAssistant';
 import Receipt from '../components/Receipt'; // <--- 1. Import Receipt
 import { useLanguage } from '../context/LanguageContext';
 import { FileText } from 'lucide-react';
+import WeightPromptModal from '../components/WeightPromptModal';
 
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  // --- NEW: WEIGHABLE ITEM STATE ---
+  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [productToWeigh, setProductToWeigh] = useState<Product | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -205,8 +210,50 @@ export default function Dashboard() {
     navigate('/');
   };
 
+  // --- NEW: HANDLE WEIGHT CONFIRMATION ---
+  const handleWeightConfirm = (weight: number) => {
+    if (!productToWeigh) return;
+
+    setCart(prev => {
+      const existing = prev.find(item => item.id === productToWeigh.id);
+      
+      if (existing) {
+        // OVERRIDE PREVENTION: Check if adding the new weight exceeds available stock
+        if (existing.quantity + weight > productToWeigh.stock_quantity) {
+          alert(`Cannot add more. Only ${productToWeigh.stock_quantity} available.`);
+          return prev;
+        }
+        // If it's already in the cart, add the new weight to the existing weight
+        return prev.map(item => 
+          item.id === productToWeigh.id ? { ...item, quantity: item.quantity + weight } : item
+        );
+      }
+      
+      // Prevent adding if the requested weight is more than the total stock
+      if (weight > productToWeigh.stock_quantity) {
+        alert(`Cannot add. Only ${productToWeigh.stock_quantity} available.`);
+        return prev;
+      }
+      
+      // Add as a new item with the custom fractional weight
+      return [...prev, { ...productToWeigh, quantity: weight }];
+    });
+
+    // Close the modal and reset
+    setIsWeightModalOpen(false);
+    setProductToWeigh(null);
+  };
 
   const addToCart = (product: Product) => {
+    // --- NEW: INTERCEPT WEIGHABLE ITEMS ---
+    // If the item needs to be weighed, open the modal and stop the normal flow
+    if (product.is_weighable) {
+      setProductToWeigh(product);
+      setIsWeightModalOpen(true);
+      return; 
+    }
+    // --------------------------------------
+
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       
@@ -540,7 +587,10 @@ export default function Dashboard() {
                   <h3 className="font-semibold text-gray-800 text-sm truncate">{product.name}</h3>
                   <div className="flex justify-between items-center mt-1">
                     <span className="text-green-600 font-bold text-sm">RM {product.price.toFixed(2)}</span>
-                    <span className="text-[10px] text-gray-400">{product.stock_quantity} left</span>
+                    {/* --- FORMAT: Smart decimals (no trailing zeros) --- */}
+                    <span className="text-[10px] text-gray-400">
+                      {product.is_weighable ? `${Number(product.stock_quantity.toFixed(3))} kg` : product.stock_quantity} left
+                    </span>
                   </div>
                 </div>
               ))}
@@ -578,14 +628,20 @@ export default function Dashboard() {
                 <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                   <div>
                     <h4 className="font-medium text-sm text-gray-800">{item.name}</h4>
-                    <p className="text-xs text-gray-500">RM {item.price.toFixed(2)} x {item.quantity}</p>
+                    {/* --- FORMAT: Smart decimals for cart summary --- */}
+                      <p className="text-xs text-gray-500">
+                        RM {item.price.toFixed(2)} x {item.is_weighable ? `${Number(item.quantity.toFixed(3))} kg` : item.quantity}
+                      </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center bg-white rounded-md border border-gray-200 shadow-sm">
                       <button onClick={() => updateQuantity(item.id, -1)} className="p-1 px-2 text-gray-600 hover:bg-gray-100">
                         <Minus size={14} />
                       </button>
-                      <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                      {/* --- FORMAT: Smart decimals inside the quantity adjuster --- */}
+                        <span className="w-auto min-w-[2rem] px-1 text-center text-sm font-medium text-blue-700">
+                          {item.is_weighable ? Number(item.quantity.toFixed(3)) : item.quantity}
+                        </span>
                       <button onClick={() => updateQuantity(item.id, 1)} className="p-1 px-2 text-gray-600 hover:bg-gray-100">
                         <Plus size={14} />
                       </button>
@@ -653,7 +709,6 @@ export default function Dashboard() {
       {!isCartOpen && (
         <button 
           onClick={() => setIsCartOpen(true)}
-          // CHANGED: Replaced 'left-6' with 'right-6' to move it to the bottom right corner
           className="md:hidden fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-2xl z-30 flex items-center gap-2 print:hidden"
         >
           <ShoppingCart size={24} />
@@ -670,6 +725,20 @@ export default function Dashboard() {
          {/* Only Admins get the Superpower */}
          {role === 'admin' && <AIAssistant onUpdate={fetchProducts} />}
       </div>
+
+      {/* --- WEIGHABLE PRODUCT MODAL (MOVED INSIDE THE DIV) --- */}
+      <WeightPromptModal
+        isOpen={isWeightModalOpen}
+        productName={productToWeigh?.name || ''}
+        onConfirm={(weight) => {
+          handleWeightConfirm(weight); 
+        }}
+        onClose={() => {
+          setIsWeightModalOpen(false);
+          setProductToWeigh(null);
+        }}
+      />
+      
     </div>
   );
 }

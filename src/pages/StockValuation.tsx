@@ -247,7 +247,10 @@ export default function StockValuation() {
                       <tr key={itemIndex} className="even:bg-gray-50 print:even:bg-transparent">
                         <td className="p-2 border border-gray-300 text-center text-gray-600">{currentSn}</td>
                         <td className="p-2 border border-gray-300 font-medium text-gray-900">{item.name}</td>
-                        <td className="p-2 border border-gray-300 text-center text-gray-800 font-bold">{item.quantity}</td>
+                          {/* --- FORMAT: Universal smart decimals for fractional stock reporting --- */}
+                          <td className="p-2 border border-gray-300 text-center text-gray-800 font-bold">
+                            {Number(item.quantity.toFixed(3))}
+                          </td>
                         <td className="p-2 border border-gray-300 text-right text-gray-600 font-mono">{formatMoney(item.cost_price)}</td>
                         {showProfit && <td className="p-2 border border-gray-300 text-right text-green-700 font-mono bg-green-50 print:bg-transparent">{formatMoney(item.sell_price)}</td>}
                         {showProfit && <td className="p-2 border border-gray-300 text-right text-green-700 font-mono bg-green-50 print:bg-transparent">{formatMoney(item.profit_per_unit)}</td>}

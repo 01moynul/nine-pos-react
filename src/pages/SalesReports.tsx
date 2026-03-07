@@ -277,7 +277,7 @@ export default function SalesReports() {
                             data.top_selling?.map((item, index) => (
                                 <tr key={index} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-800">{item.product_name}</td>
-                                    <td className="px-6 py-4 text-gray-600">{item.sold}</td>
+                                    <td className="px-6 py-4 text-gray-600">{Number(item.sold.toFixed(3))}</td>
                                     <td className="px-6 py-4 text-right font-mono text-gray-800">{formatMoney(item.revenue)}</td>
                                 </tr>
                             ))
