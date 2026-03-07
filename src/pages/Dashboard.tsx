@@ -25,7 +25,18 @@ export default function Dashboard() {
   const prevCartLength = useRef(0);
 
   // --- NEW: PRINTING STATE ---
-  const [lastSale, setLastSale] = useState<{ id: number; items: CartItem[]; total: number; date: string } | null>(null);
+ // --- UPDATED: Allow string IDs for new RCPT format and optional LHDN data ---
+  const [lastSale, setLastSale] = useState<{ 
+    id: number | string; 
+    items: CartItem[]; 
+    total: number; 
+    date: string;
+    lhdnQrUrl?: string;
+    lhdnValidationId?: string;
+  } | null>(null);
+  // --- NEW: LHDN Toggle State ---
+  const [requestEInvoice, setRequestEInvoice] = useState(false);
+
   const receiptRef = useRef<HTMLDivElement>(null);
   const { t, toggleLanguage } = useLanguage();
 
@@ -295,7 +306,11 @@ export default function Dashboard() {
   // --- NEW: HANDLING CHECKOUT & PRINTING ---
   const handleCheckout = async () => {
     if (cart.length === 0) return;
-    const payload = { items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })) };
+    // --- UPDATED: We now include the request_einvoice boolean in the payload ---
+  const payload = { 
+    items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })),
+    request_einvoice: requestEInvoice 
+  };
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const sstTax = cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0);
     const currentTotal = subtotal + sstTax;
@@ -324,7 +339,10 @@ export default function Dashboard() {
         id: response.data.sale_id,
         items: currentItems,
         total: currentTotal,
-        date: new Date().toLocaleString()
+        date: new Date().toLocaleString(),
+        // --- NEW: Safely extract LHDN data if the backend provided it ---
+        lhdnQrUrl: response.data.lhdn?.QRCodeURL,
+        lhdnValidationId: response.data.lhdn?.ValidationID
       });
 
       // 2. Clear Cart & Update UI
@@ -367,7 +385,7 @@ export default function Dashboard() {
     <div className="flex h-screen bg-gray-100 overflow-hidden relative">
       
       {/* --- HIDDEN RECEIPT COMPONENT (Only visible during print) --- */}
-      <div>  {/* <--- REMOVE "className='hidden'" */}
+      <div>
         {lastSale && (
           <Receipt 
             ref={receiptRef} 
@@ -375,6 +393,9 @@ export default function Dashboard() {
             items={lastSale.items} 
             total={lastSale.total} 
             date={lastSale.date}
+            // --- NEW: Pass the LHDN props to the thermal printer layout ---
+            lhdnQrUrl={lastSale.lhdnQrUrl}
+            lhdnValidationId={lastSale.lhdnValidationId}
           />
         )}
       </div>
@@ -589,6 +610,20 @@ export default function Dashboard() {
             <div className="flex justify-between text-xl font-bold text-gray-800 pt-2 border-t border-gray-200">
               <span>{t('total')}</span>
               <span>RM {(cartTotal + cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0)).toFixed(2)}</span>
+            </div>
+            {/* --- NEW: LHDN e-Invoice Toggle --- */}
+            <div className="flex items-center justify-between mb-4 bg-white p-3 rounded-lg border border-gray-200">
+              <label htmlFor="einvoice-toggle" className="text-sm font-semibold text-gray-700 cursor-pointer flex items-center gap-2">
+                <FileText size={16} className="text-blue-600" />
+                Request LHDN e-Invoice
+              </label>
+              <input
+                id="einvoice-toggle"
+                type="checkbox"
+                checked={requestEInvoice}
+                onChange={(e) => setRequestEInvoice(e.target.checked)}
+                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+              />
             </div>
             
             {/* --- UPGRADED: CART ACTION BUTTONS (Task 2.4) --- */}

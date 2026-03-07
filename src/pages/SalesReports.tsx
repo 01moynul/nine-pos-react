@@ -397,7 +397,7 @@ export default function SalesReports() {
 
                 {/* Receipt Header */}
                 <div className="text-center border-b pb-4 mb-4">
-                    <h2 className="text-2xl font-bold text-gray-800">REZEKI AL ADEEB ENTERPRISEt</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">REZEKI AL ADEEB ENTERPRISE</h2>
                     <p className="text-sm text-gray-500">Digital Receipt</p>
                     <p className="text-xs text-gray-400 mt-1">Transaction #{selectedReceipt.id}</p>
                     <p className="text-xs text-gray-400">{new Date(selectedReceipt.sale_time).toLocaleString()}</p>

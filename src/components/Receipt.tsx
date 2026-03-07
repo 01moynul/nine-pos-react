@@ -2,19 +2,23 @@ import { forwardRef } from 'react';
 import type { CartItem } from '../types';
 
 interface ReceiptProps {
-  orderId: number | null;
+  // --- UPDATED: Allow both number and string IDs ---
+  orderId: number | string | null; 
   items: CartItem[];
   total: number;
   date: string;
+  // --- NEW: Optional LHDN Props ---
+  lhdnQrUrl?: string;
+  lhdnValidationId?: string;
 }
 
 // forwardRef allows the parent (Dashboard) to reference this DOM element for printing
-const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ orderId, items, total, date }, ref) => {
+const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ orderId, items, total, date, lhdnQrUrl, lhdnValidationId }, ref) => {
   return (
     <div ref={ref} className="hidden print:block p-2 bg-white text-black font-mono text-sm w-[72mm] mx-auto">
       {/* HEADER */}
       <div className="text-center mb-4 border-b border-black pb-2">
-        <h1 className="text-xl font-bold">REZEKI AL ADEEB ENTERPRISEt</h1>
+        <h1 className="text-xl font-bold">REZEKI AL ADEEB ENTERPRISE</h1>
         <p>A-0-3, PV5 Platinum Hill Condo, Jalan Melati Utama 3, Taman Melati Utama, 53100 Kuala Lumpur</p>
         <p>Tel: +60 14-76 46762</p>
       </div>
@@ -65,6 +69,18 @@ const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({ orderId, items, tota
           <span>RM {total.toFixed(2)}</span>
         </div>
       </div>
+
+      {/* --- NEW: LHDN Sandbox QR Code --- */}
+      {lhdnQrUrl && (
+        <div className="flex flex-col items-center justify-center my-6 border-t border-dashed border-black pt-4">
+          <span className="text-[10px] font-bold mb-1">LHDN e-Invoice Validated</span>
+          {/* We use standard HTML img tag. The thermal printer CSS will render this in black & white */}
+          <img src={lhdnQrUrl} alt="LHDN QR Code" className="w-24 h-24 mb-1" />
+          <span className="text-[9px] text-center break-all w-full px-2">
+            {lhdnValidationId}
+          </span>
+        </div>
+      )}
 
       {/* FOOTER */}
       <div className="text-center text-xs border-t border-black pt-2">
