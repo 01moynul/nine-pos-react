@@ -1,5 +1,5 @@
 // src/components/WeightPromptModal.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 // Define the properties this component expects to receive
 interface WeightPromptModalProps {
