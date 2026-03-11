@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, DollarSign, ShoppingBag, TrendingUp, Package, Clock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import SmartCategorySelector from '../components/SmartCategorySelector'; // --- NEW: Import Combobox ---
 
 // --- INTERFACES ---
 interface VoidedTransaction {
@@ -57,7 +58,8 @@ export default function SalesReports() {
   
   // --- Filter State (Task 3.2) ---
   const [timeframe, setTimeframe] = useState<string>('all'); 
-  const [searchQuery, setSearchQuery] = useState<string>(''); // NEW: Item Search State
+  const [searchQuery, setSearchQuery] = useState<string>(''); 
+  const [selectedCategory, setSelectedCategory] = useState<string>('All'); // --- NEW: Category State ---
   const API_URL = import.meta.env.VITE_API_URL;
 
   // --- NEW: Custom Date/Time State ---
@@ -92,6 +94,10 @@ export default function SalesReports() {
         if (searchQuery) {
             url += `&search=${encodeURIComponent(searchQuery)}`;
         }
+        // --- NEW: Append the category filter ---
+        if (selectedCategory && selectedCategory !== 'All') {
+            url += `&category=${encodeURIComponent(selectedCategory)}`;
+        }
 
         const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` }
@@ -105,7 +111,7 @@ export default function SalesReports() {
     };
 
     fetchFilteredReports();
-  }, [timeframe, customStart, customEnd, searchQuery, API_URL]); // <-- NEW: Added searchQuery
+  }, [timeframe, customStart, customEnd, searchQuery, selectedCategory, API_URL]); // --- UPGRADED: Added selectedCategory ---
   // Format Money: RM 1,234.56
   const formatMoney = (amount: number) => {
     const safeAmount = amount || 0; 
@@ -194,23 +200,34 @@ export default function SalesReports() {
                     )}
                 </div>
 
-                {/* NEW: Item Specific Search Bar */}
-                <div className="flex items-center">
-                    <input
-                        type="text"
-                        placeholder="Search Product or SKU..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-inner"
-                    />
-                    {searchQuery && (
-                        <button 
-                            onClick={() => setSearchQuery('')}
-                            className="ml-2 text-gray-400 hover:text-red-500 text-sm font-bold"
-                        >
-                            Clear
-                        </button>
-                    )}
+                {/* --- UPGRADED: Category Filter & Item Search Bar --- */}
+                <div className="flex items-center gap-3 z-50">
+                    <div className="w-48">
+                        <SmartCategorySelector 
+                            value={selectedCategory === 'All' ? '' : selectedCategory} 
+                            onChange={(val) => setSelectedCategory(val || 'All')}
+                        />
+                    </div>
+                    <div className="flex items-center">
+                        <input
+                            type="text"
+                            placeholder="Search Product or SKU..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-inner"
+                        />
+                        {(searchQuery || selectedCategory !== 'All') && (
+                            <button 
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setSelectedCategory('All');
+                                }}
+                                className="ml-2 text-gray-400 hover:text-red-500 text-sm font-bold"
+                            >
+                                Clear All
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         
@@ -299,7 +316,7 @@ export default function SalesReports() {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sale ID</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                                 {/* NEW: Added Net Profit Header */}
-                                <th className="px-6 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider font-bold">Net Profit</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider">Net Profit</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Security Audit</th>
