@@ -4,13 +4,14 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 // Replace your current lucide-react import with this:
-import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Printer, Monitor, RefreshCw, Cloud } from 'lucide-react';
+import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Monitor, RefreshCw, Cloud } from 'lucide-react';
 import type { Product, CartItem } from '../types';
 import AIAssistant from '../components/AIAssistant';
 import Receipt from '../components/Receipt'; // <--- 1. Import Receipt
 import { useLanguage } from '../context/LanguageContext';
 import { FileText } from 'lucide-react';
 import WeightPromptModal from '../components/WeightPromptModal';
+import PaymentModal from '../components/PaymentModal';
 
 
 export default function Dashboard() {
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   // --- NEW: SECURITY STATE (Task 2.4) ---
   const [securitySessionId, setSecuritySessionId] = useState<string | null>(null);
   const prevCartLength = useRef(0);
@@ -351,13 +353,16 @@ export default function Dashboard() {
   };
 
   // --- NEW: HANDLING CHECKOUT & PRINTING ---
-  const handleCheckout = async () => {
+  const handleFinalPayment = async (method: string, amountTendered: number, shouldPrint: boolean) => {
     if (cart.length === 0) return;
-    // --- UPDATED: We now include the request_einvoice boolean in the payload ---
-  const payload = { 
-    items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })),
-    request_einvoice: requestEInvoice 
-  };
+    
+    const payload = { 
+      items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })),
+      request_einvoice: requestEInvoice,
+      payment_method: method,
+      amount_tendered: amountTendered
+    };
+    
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const sstTax = cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0);
     const currentTotal = subtotal + sstTax;
@@ -395,12 +400,17 @@ export default function Dashboard() {
       // 2. Clear Cart & Update UI
       setCart([]);
       setIsCartOpen(false);
+      setIsPaymentModalOpen(false); // Close Modal
       fetchProducts();
       
-      // 3. Trigger Print (Wait 100ms for React to render the receipt first)
-      setTimeout(() => {
-        window.print();
-      }, 500);
+      // 3. Trigger Print OR Kick Drawer
+      if (shouldPrint) {
+        setTimeout(() => window.print(), 500);
+      } else {
+        await axios.post(`${API_URL}/api/printer/kick-drawer`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
 
     } catch (error) {
       console.error(error);
@@ -694,11 +704,11 @@ export default function Dashboard() {
               </button>
               
               <button 
-                onClick={handleCheckout}
+                onClick={() => setIsPaymentModalOpen(true)}
                 className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 disabled={cart.length === 0}
               >
-                <Printer size={20} /> {t('pay_print')}
+                <ShoppingCart size={20} /> Checkout
               </button>
             </div>
           </div>
@@ -737,6 +747,14 @@ export default function Dashboard() {
           setIsWeightModalOpen(false);
           setProductToWeigh(null);
         }}
+      />
+
+      {/* --- NEW: PAYMENT & PHANTOM RECEIPT MODAL --- */}
+      <PaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        totalAmount={(cartTotal + cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0))}
+        onConfirmPayment={handleFinalPayment}
       />
       
     </div>
