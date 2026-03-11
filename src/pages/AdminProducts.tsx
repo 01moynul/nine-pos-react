@@ -77,7 +77,7 @@ export default function AdminProducts() {
          // 3. PRODUCT NOT FOUND (404): Auto-trigger the Rapid Input Form
           if (apiError.response && apiError.response.status === 404) {
             setEditingProduct(null); // Set to "Create Mode"
-            setFormData({ sku: scannedBarcode, is_sst_applicable: true }); // Auto-fill SKU and default SST to true
+            setFormData({ sku: scannedBarcode, is_sst_applicable: false }); // Auto-fill SKU and default SST to false
             setIsModalOpen(true); // Pop open the modal
             
             // 4. Snap the keyboard focus directly to the "Product Name" field
@@ -142,7 +142,7 @@ export default function AdminProducts() {
   // --- CLICK HANDLERS ---
   const handleAddClick = () => {
     setEditingProduct(null); // Switch to "Create Mode"
-    setFormData({ is_sst_applicable: true }); // Default SST to true for new items
+    setFormData({ is_sst_applicable: false }); // Default SST to false for new items
     setIsModalOpen(true);    // Open Modal
   };
 
