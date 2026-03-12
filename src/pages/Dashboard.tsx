@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 // Replace your current lucide-react import with this:
-import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Monitor, RefreshCw, Cloud } from 'lucide-react';
+import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Monitor, RefreshCw, Cloud, DollarSign } from 'lucide-react';
 import type { Product, CartItem } from '../types';
 import AIAssistant from '../components/AIAssistant';
 import Receipt from '../components/Receipt'; // <--- 1. Import Receipt
@@ -512,6 +512,15 @@ export default function Dashboard() {
                   <span className="hidden sm:inline">Backups</span>
                 </button>
                 {/* --------------------------- */}
+                {/* --- NEW: EXPENSES BUTTON --- */}
+                <button 
+                  onClick={() => navigate('/admin/expenses')} 
+                  className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-red-200"
+                >
+                  <DollarSign size={16} /> 
+                  <span className="hidden sm:inline">Expenses</span>
+                </button>
+                {/* ---------------------------- */}
               </>
             )}
 

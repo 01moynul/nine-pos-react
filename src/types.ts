@@ -17,3 +17,14 @@ export interface Product {
 export interface CartItem extends Product {
   quantity: number;
 }
+
+// --- NEW: Shop Expenses Management ---
+export interface Expense {
+  id: number;
+  expense_type: string;
+  amount: number;
+  date: string;
+  description: string;
+  logged_by: string;
+  created_at: string;
+}
