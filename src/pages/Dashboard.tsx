@@ -134,6 +134,14 @@ export default function Dashboard() {
 
           const scannedProduct = response.data;
 
+          // --- NEW: THE DATA FIREWALL ---
+          // Protect the state from malformed responses (like 304 redirects from weird QR URLs)
+          if (!scannedProduct || typeof scannedProduct.id === 'undefined' || typeof scannedProduct.price === 'undefined') {
+            setTimeout(() => alert(`Invalid Barcode or QR Code Format Scanned.`), 10);
+            return; // Stop execution immediately, preventing the white screen crash
+          }
+          // ------------------------------
+
           // 2. PRODUCT EXISTS: Drop it into the cart (WITH FIREWALL)
           setCart(prev => {
             const existing = prev.find(item => item.id === scannedProduct.id);
@@ -352,9 +360,9 @@ export default function Dashboard() {
     setIsCartOpen(false);
   };
 
-  // --- NEW: HANDLING CHECKOUT & PRINTING ---
-  const handleFinalPayment = async (method: string, amountTendered: number, shouldPrint: boolean) => {
-    if (cart.length === 0) return;
+  // --- NEW: DECOUPLED CHECKOUT & PRINTING (Step 1) ---
+  const processTransaction = async (method: string, amountTendered: number) => {
+    if (cart.length === 0) return false;
     
     const payload = { 
       items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })),
@@ -366,15 +374,15 @@ export default function Dashboard() {
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const sstTax = cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0);
     const currentTotal = subtotal + sstTax;
-    const currentItems = [...cart]; // Snapshot of cart
+    const currentItems = [...cart]; // Snapshot of cart before clearing
 
     try {
       const token = localStorage.getItem('token');
+      // 1. Save the sale to the database
       const response = await axios.post(`${API_URL}/api/checkout`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // --- NEW: SUCCESS TRIGGER (Task 2.4) ---
       if (securitySessionId) {
         axios.post(`${API_URL}/api/security/stop-success`, {
           session_id: securitySessionId,
@@ -382,40 +390,44 @@ export default function Dashboard() {
         }, { headers: { Authorization: `Bearer ${token}` } })
         .catch(err => console.error("Failed to trigger success camera stop:", err));
         
-        setSecuritySessionId(null); // Clear session
+        setSecuritySessionId(null); 
       }
-      // ---------------------------------------
 
-      // 1. Prepare data for the Receipt
+      // 2. Prepare data for the Receipt (saved in state for printing later)
       setLastSale({
         id: response.data.sale_id,
         items: currentItems,
         total: currentTotal,
         date: new Date().toLocaleString(),
-        // --- NEW: Safely extract LHDN data if the backend provided it ---
         lhdnQrUrl: response.data.lhdn?.QRCodeURL,
         lhdnValidationId: response.data.lhdn?.ValidationID
       });
 
-      // 2. Clear Cart & Update UI
-      setCart([]);
-      setIsCartOpen(false);
-      setIsPaymentModalOpen(false); // Close Modal
-      fetchProducts();
-      
-      // 3. Trigger Print OR Kick Drawer
-      if (shouldPrint) {
-        setTimeout(() => window.print(), 500);
-      } else {
-        await axios.post(`${API_URL}/api/printer/kick-drawer`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      }
+      // 3. Open the cash drawer IMMEDIATELY so cashier can make change
+      await axios.post(`${API_URL}/api/printer/kick-drawer`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
+      // NOTE: We deliberately DO NOT clear the cart or close the modal here!
+      return true; // Indicate success to the modal
     } catch (error) {
       console.error(error);
-      alert('Checkout failed.');
+      alert('Checkout failed. Please check connection and try again.');
+      return false;
     }
+  };
+
+  const finalizeAndClear = (shouldPrint: boolean) => {
+    // 1. Trigger Print if requested
+    if (shouldPrint) {
+      setTimeout(() => window.print(), 500);
+    }
+    
+    // 2. Clear Cart & Update UI for the next customer
+    setCart([]);
+    setIsCartOpen(false);
+    setIsPaymentModalOpen(false); 
+    fetchProducts();
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -749,12 +761,13 @@ export default function Dashboard() {
         }}
       />
 
-      {/* --- NEW: PAYMENT & PHANTOM RECEIPT MODAL --- */}
+      {/* --- UPDATED: PAYMENT & PHANTOM RECEIPT MODAL --- */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
         totalAmount={(cartTotal + cart.reduce((sum, item) => sum + (item.is_sst_applicable ? (item.price * item.quantity * 0.06) : 0), 0))}
-        onConfirmPayment={handleFinalPayment}
+        onProcessTransaction={processTransaction}
+        onFinalizeAndClear={finalizeAndClear}
       />
       
     </div>

@@ -8,14 +8,16 @@ interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   totalAmount: number;
-  onConfirmPayment: (method: string, amountTendered: number, shouldPrint: boolean) => void;
+  onProcessTransaction: (method: string, amountTendered: number) => Promise<boolean>;
+  onFinalizeAndClear: (shouldPrint: boolean) => void;
 }
 
-export default function PaymentModal({ isOpen, onClose, totalAmount, onConfirmPayment }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, totalAmount, onProcessTransaction, onFinalizeAndClear }: PaymentModalProps) {
   // We track which screen of the modal we are on
-  const [step, setStep] = useState<'select-method' | 'cash-input' | 'qr-confirm'>('select-method');
+  const [step, setStep] = useState<'select-method' | 'cash-input' | 'qr-confirm' | 'receipt-prompt'>('select-method');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'qr' | 'card'>('cash');
   const [tenderedAmount, setTenderedAmount] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
 if (!isOpen) return null;
 
@@ -29,14 +31,25 @@ if (!isOpen) return null;
     onClose();
   };
 
-  // Handles the final button clicks
-  const handleFinalize = (shouldPrint: boolean) => {
+  // --- NEW: Step 1 of Checkout (Save DB & Open Drawer) ---
+  const handleProcessPayment = async () => {
+    setIsProcessing(true);
     const finalTendered = paymentMethod === 'cash' ? parseFloat(tenderedAmount) : totalAmount;
     
-    // Reset state safely for the next customer
+    // Call Dashboard's processTransaction API call
+    const success = await onProcessTransaction(paymentMethod, finalTendered);
+    
+    setIsProcessing(false);
+    if (success) {
+      setStep('receipt-prompt');
+    }
+  };
+
+  // --- NEW: Step 2 of Checkout (Print & Clear) ---
+  const handleFinalChoice = (shouldPrint: boolean) => {
     setStep('select-method');
     setTenderedAmount('');
-    onConfirmPayment(paymentMethod, finalTendered, shouldPrint);
+    onFinalizeAndClear(shouldPrint);
   };
 
   return (
@@ -109,20 +122,13 @@ if (!isOpen) return null;
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3 pt-4 border-t">
+              <div className="pt-4 border-t">
                 <button 
-                  disabled={!isCashValid}
-                  onClick={() => handleFinalize(true)}
-                  className="p-3 bg-blue-600 text-white rounded-lg font-bold flex flex-col items-center justify-center disabled:opacity-50"
+                  disabled={!isCashValid || isProcessing}
+                  onClick={handleProcessPayment}
+                  className="w-full p-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg transition-colors flex items-center justify-center disabled:opacity-50"
                 >
-                  <Printer size={20} className="mb-1"/> Print Receipt
-                </button>
-                <button 
-                  disabled={!isCashValid}
-                  onClick={() => handleFinalize(false)}
-                  className="p-3 bg-gray-800 text-white rounded-lg font-bold flex flex-col items-center justify-center disabled:opacity-50"
-                >
-                  <Monitor size={20} className="mb-1"/> No Print (Drawer)
+                  {isProcessing ? 'Processing...' : 'Confirm Payment & Open Drawer'}
                 </button>
               </div>
             </div>
@@ -136,25 +142,52 @@ if (!isOpen) return null;
                   <p className="text-sm mt-1">Ensure customer has transferred exactly RM {totalAmount.toFixed(2)}</p>
                </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-4 border-t">
+              <div className="pt-4 border-t">
                 <button 
-                  onClick={() => handleFinalize(true)}
-                  className="p-3 bg-blue-600 text-white rounded-lg font-bold flex flex-col items-center justify-center"
+                  disabled={isProcessing}
+                  onClick={handleProcessPayment}
+                  className="w-full p-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-lg transition-colors flex items-center justify-center disabled:opacity-50"
                 >
-                  <Printer size={20} className="mb-1"/> Print Receipt
-                </button>
-                <button 
-                  onClick={() => handleFinalize(false)}
-                  className="p-3 bg-gray-800 text-white rounded-lg font-bold flex flex-col items-center justify-center"
-                >
-                  <Monitor size={20} className="mb-1"/> No Print (Drawer)
+                  {isProcessing ? 'Processing...' : 'Payment Received'}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Global Back Button (Only show if not on the first step) */}
-          {step !== 'select-method' && (
+          {/* --- NEW STEP 3: Receipt & Change Prompt --- */}
+          {step === 'receipt-prompt' && (
+            <div className="space-y-6">
+              <div className="p-6 bg-green-100 text-green-900 rounded-xl text-center border-2 border-green-300 shadow-inner">
+                <p className="text-lg font-bold uppercase tracking-wide text-green-700 mb-2">Transaction Complete</p>
+                {paymentMethod === 'cash' ? (
+                  <>
+                    <p className="text-gray-600 font-semibold mb-1">Change to return:</p>
+                    <p className="text-6xl font-black tracking-tight">RM {changeDue >= 0 ? changeDue.toFixed(2) : '0.00'}</p>
+                  </>
+                ) : (
+                  <p className="text-4xl font-black tracking-tight">RM 0.00 Change</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                <button 
+                  onClick={() => handleFinalChoice(true)}
+                  className="p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex flex-col items-center justify-center shadow-lg"
+                >
+                  <Printer size={28} className="mb-2"/> Print Receipt
+                </button>
+                <button 
+                  onClick={() => handleFinalChoice(false)}
+                  className="p-4 bg-gray-800 hover:bg-gray-900 text-white rounded-xl font-bold flex flex-col items-center justify-center shadow-lg"
+                >
+                  <Monitor size={28} className="mb-2"/> Next Customer
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Global Back Button (Only show if not on the first step or receipt prompt) */}
+          {step !== 'select-method' && step !== 'receipt-prompt' && (
             <button 
               onClick={() => setStep('select-method')}
               className="mt-4 w-full text-gray-500 font-bold hover:text-gray-800"
