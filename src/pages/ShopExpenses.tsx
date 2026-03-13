@@ -1,17 +1,30 @@
 // src/pages/ShopExpenses.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, DollarSign, Calendar, FileText, Tag, Loader2, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, DollarSign, Calendar, FileText, Tag, Loader2, ArrowLeft, TrendingUp } from 'lucide-react';
 import type { Expense } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
+// NEW: Interface to match the updated Go backend response
+interface ExpenseReport {
+  expenses: Expense[];
+  total_expenses: number;
+  gross_profit: number;
+  standing_profit: number;
+}
+
 export default function ShopExpenses() {
   const navigate = useNavigate();
   // --- STATE MANAGEMENT ---
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [report, setReport] = useState<ExpenseReport | null>(null);
+  
+  // NEW: Date Filter State
+  const [timeframe, setTimeframe] = useState('today'); 
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,23 +38,38 @@ export default function ShopExpenses() {
   const expenseCategories = ['Utilities', 'Salary', 'Restock', 'Maintenance', 'Marketing', 'Petty Cash', 'Other'];
 
   // --- API CALLS ---
-  const fetchExpenses = async () => {
+  const fetchExpenses = useCallback(async () => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/api/expenses`, {
+      
+      // Build query parameters for date filtering
+      const params = new URLSearchParams({
+        timeframe: timeframe,
+        customStart: customStart,
+        customEnd: customEnd
+      });
+
+      // Fetch the new ExpenseReport object
+      const response = await axios.get(`${API_URL}/api/expenses?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setExpenses(response.data);
+      
+      setReport(response.data);
     } catch (error) {
-      console.error('Failed to fetch expenses:', error);
+      console.error('Failed to fetch expenses', error);
+      alert('Failed to load financial data');
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeframe, customStart, customEnd]); // <-- Tells React exactly when to update this function
 
+  // Auto-fetch when the timeframe dropdown changes
   useEffect(() => {
-    fetchExpenses();
-  }, []);
+    if (timeframe !== 'custom') {
+      fetchExpenses();
+    }
+  }, [timeframe, fetchExpenses]); // <-- Linter is now perfectly happy
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,21 +121,84 @@ export default function ShopExpenses() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
+      {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <FileText className="text-blue-600" />
+            Financial Summary (P&L)
+          </h1>
           <button 
             onClick={() => navigate('/dashboard')}
-            className="p-3 bg-white hover:bg-gray-50 text-gray-800 rounded-full shadow-sm border border-gray-100 transition-colors"
-            title="Back to Dashboard"
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200 transition-colors"
           >
-            <ArrowLeft size={24} />
+            <ArrowLeft size={18} />
+            Back to Dashboard
           </button>
-          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-            <DollarSign className="text-red-500" size={32} />
-            Shop Expenses Management
-          </h1>
         </div>
-      </div>
+
+        {/* --- NEW: P&L DASHBOARD & DATE FILTERS --- */}
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <Calendar size={20} className="text-gray-500"/>
+              Performance Timeframe
+            </h2>
+            
+            {/* Date Filters */}
+            <div className="flex items-center gap-3">
+              <select 
+                value={timeframe} 
+                onChange={(e) => setTimeframe(e.target.value)}
+                className="p-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+              >
+                <option value="today">Today</option>
+                <option value="7days">Last 7 Days</option>
+                <option value="30days">Last 30 Days</option>
+                <option value="custom">Custom Range</option>
+              </select>
+              
+              {timeframe === 'custom' && (
+                <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border border-gray-200">
+                  <input type="datetime-local" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="p-1.5 bg-transparent border-none outline-none text-sm" />
+                  <span className="text-gray-400 font-bold">to</span>
+                  <input type="datetime-local" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="p-1.5 bg-transparent border-none outline-none text-sm" />
+                  <button onClick={fetchExpenses} className="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-sm font-bold shadow-sm transition-colors">Apply</button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* KPI Cards */}
+          {report && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-gray-100 pt-5">
+              
+              <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Gross Profit (Sales)</p>
+                  <h3 className="text-2xl font-bold text-blue-800">RM {report.gross_profit.toFixed(2)}</h3>
+                </div>
+                <div className="p-3 bg-blue-200 text-blue-700 rounded-full"><TrendingUp size={24} /></div>
+              </div>
+              
+              <div className="bg-red-50 p-5 rounded-xl border border-red-100 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-red-600 font-bold uppercase tracking-wider mb-1">Total Expenses</p>
+                  <h3 className="text-2xl font-bold text-red-800">- RM {report.total_expenses.toFixed(2)}</h3>
+                </div>
+                <div className="p-3 bg-red-200 text-red-700 rounded-full"><TrendingUp className="rotate-180" size={24} /></div>
+              </div>
+
+              <div className="bg-emerald-50 p-5 rounded-xl border-2 border-emerald-200 flex items-center justify-between shadow-sm">
+                <div>
+                  <p className="text-xs text-emerald-700 font-bold uppercase tracking-wider mb-1">Standing Profit</p>
+                  <h3 className="text-2xl font-bold text-emerald-800">RM {report.standing_profit.toFixed(2)}</h3>
+                </div>
+                <div className="p-3 bg-emerald-200 text-emerald-700 rounded-full"><DollarSign size={24} /></div>
+              </div>
+
+            </div>
+          )}
+        </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
@@ -118,7 +209,7 @@ export default function ShopExpenses() {
             
             {/* Expense Type Dropdown */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2"><Tag size={16}/> Category</label>
+              <label className="flex text-sm font-medium text-gray-700 mb-1 items-center gap-2"><Tag size={16}/> Category</label>
               <select 
                 value={expenseType} 
                 onChange={(e) => setExpenseType(e.target.value)}
@@ -130,7 +221,7 @@ export default function ShopExpenses() {
 
             {/* Amount Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2"><DollarSign size={16}/> Amount (RM)</label>
+              <label className="flex text-sm font-medium text-gray-700 mb-1 items-center gap-2"><DollarSign size={16}/> Amount (RM)</label>
               <input 
                 type="number" step="0.01" min="0" required
                 value={amount} onChange={(e) => setAmount(e.target.value)}
@@ -141,7 +232,7 @@ export default function ShopExpenses() {
 
             {/* Date Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2"><Calendar size={16}/> Date</label>
+              <label className="flex text-sm font-medium text-gray-700 mb-1 items-center gap-2"><Calendar size={16}/> Date</label>
               <input 
                 type="date" required
                 value={date} onChange={(e) => setDate(e.target.value)}
@@ -151,7 +242,7 @@ export default function ShopExpenses() {
 
             {/* Description Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2"><FileText size={16}/> Note / Description</label>
+              <label className="flex text-sm font-medium text-gray-700 mb-1 items-center gap-2"><FileText size={16}/> Note / Description</label>
               <textarea 
                 rows={3}
                 value={description} onChange={(e) => setDescription(e.target.value)}
@@ -174,8 +265,8 @@ export default function ShopExpenses() {
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
              <h2 className="text-xl font-bold text-gray-800">Expense History</h2>
-             <span className="bg-red-100 text-red-800 text-sm font-bold px-3 py-1 rounded-full">
-               Total: RM {expenses.reduce((sum, exp) => sum + exp.amount, 0).toFixed(2)}
+             <span className="bg-red-100 text-red-800 text-sm font-bold px-3 py-1 rounded-full shadow-sm">
+               Total: RM {(report?.total_expenses || 0).toFixed(2)}
              </span>
           </div>
           
@@ -191,12 +282,14 @@ export default function ShopExpenses() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {expenses.length === 0 ? (
+                {(!report?.expenses || report.expenses.length === 0) ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-gray-500 italic">No expenses recorded yet.</td>
+                    <td colSpan={5} className="p-8 text-center text-gray-500 italic">
+                      No expenses logged for this timeframe.
+                    </td>
                   </tr>
                 ) : (
-                  expenses.map(expense => (
+                  report.expenses.map((expense) => (
                     <tr key={expense.id} className="hover:bg-gray-50 transition-colors">
                       <td className="p-4 whitespace-nowrap text-sm text-gray-700">
                         {new Date(expense.date).toLocaleDateString()}
