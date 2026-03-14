@@ -4,14 +4,16 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 // Replace your current lucide-react import with this:
-import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Monitor, RefreshCw, Cloud, DollarSign } from 'lucide-react';
-import type { Product, CartItem } from '../types';
+import { LogOut, Search, ShoppingCart, Plus, Minus, Trash2, X, Settings, BarChart3, Monitor, RefreshCw, Cloud, DollarSign, Lock, LockOpen } from 'lucide-react';
+import type { Product, CartItem, ShiftLog } from '../types'; // <-- ADD ShiftLog
+import ShiftManagerModal from '../components/ShiftManagerModal'; // <-- ADD THIS
 import AIAssistant from '../components/AIAssistant';
 import Receipt from '../components/Receipt'; // <--- 1. Import Receipt
 import { useLanguage } from '../context/LanguageContext';
 import { FileText } from 'lucide-react';
 import WeightPromptModal from '../components/WeightPromptModal';
 import PaymentModal from '../components/PaymentModal';
+
 
 
 export default function Dashboard() {
@@ -44,6 +46,12 @@ export default function Dashboard() {
   // --- NEW: LHDN Toggle State ---
   const [requestEInvoice, setRequestEInvoice] = useState(false);
 
+  // --- NEW: SHIFT MANAGEMENT STATE ---
+  const [isShiftTrackingEnabled, setIsShiftTrackingEnabled] = useState(false);
+  const [activeShift, setActiveShift] = useState<ShiftLog | null>(null);
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [shiftModalType, setShiftModalType] = useState<'open' | 'close'>('open');
+
   const receiptRef = useRef<HTMLDivElement>(null);
   const { t, toggleLanguage } = useLanguage();
 
@@ -73,6 +81,45 @@ export default function Dashboard() {
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  // --- NEW: FETCH SHIFT STATUS ---
+  const fetchShiftStatus = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    try {
+      // 1. Check if the Admin Kill Switch is ON
+      const settingsRes = await axios.get(`${API_URL}/api/settings`, { headers: { Authorization: `Bearer ${token}` } });
+      const trackingEnabled = settingsRes.data.enable_shift_tracking;
+      setIsShiftTrackingEnabled(trackingEnabled);
+
+      if (trackingEnabled) {
+        // 2. Check if a shift is currently open
+        try {
+          const shiftRes = await axios.get(`${API_URL}/api/shift/active`, { headers: { Authorization: `Bearer ${token}` } });
+          setActiveShift(shiftRes.data);
+        } catch (err) {
+          // 1. Define the shape of the error to satisfy the linter
+          interface ApiError {
+            response?: {
+              status: number;
+            };
+          }
+          // 2. Cast the unknown error to our specific interface
+          const apiError = err as ApiError;
+          
+          if (apiError.response && apiError.response.status === 404) {
+            setActiveShift(null); // 404 means register is closed!
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch shift status:", error);
+    }
+  }, [API_URL]);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchShiftStatus(); // <-- Call it when Dashboard loads
+  }, [fetchProducts, fetchShiftStatus]);
 
   // --- NEW: ANTI-THEFT CAMERA START TRIGGER (Task 2.4) ---
   useEffect(() => {
@@ -134,6 +181,12 @@ export default function Dashboard() {
 
           const scannedProduct = response.data;
 
+          // --- NEW: SHIFT LOCKOUT (SCANNER) ---
+          if (isShiftTrackingEnabled && !activeShift) {
+            setTimeout(() => alert(`Cannot add items. Please open the register first.`), 10);
+            return;
+          }
+
           // --- NEW: THE DATA FIREWALL ---
           // Protect the state from malformed responses (like 304 redirects from weird QR URLs)
           if (!scannedProduct || typeof scannedProduct.id === 'undefined' || typeof scannedProduct.price === 'undefined') {
@@ -188,7 +241,7 @@ export default function Dashboard() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [API_URL]);
+  }, [API_URL, activeShift, isShiftTrackingEnabled]);
   // ---------------------------------------------------------
 
   // --- NEW: DUAL-SCREEN BROADCAST CHANNEL (Action 2.3) ---
@@ -255,6 +308,11 @@ export default function Dashboard() {
   };
 
   const addToCart = (product: Product) => {
+    // --- NEW: SHIFT LOCKOUT (CLICK) ---
+    if (isShiftTrackingEnabled && !activeShift) {
+      alert("Cannot add items. Please open the register first.");
+      return;
+    }
     // --- NEW: INTERCEPT WEIGHABLE ITEMS ---
     // If the item needs to be weighed, open the modal and stop the normal flow
     if (product.is_weighable) {
@@ -521,6 +579,17 @@ export default function Dashboard() {
                   <span className="hidden sm:inline">Expenses</span>
                 </button>
                 {/* ---------------------------- */}
+                
+                {/* --- NEW: SHIFT AUDIT BUTTON --- */}
+                <button 
+                  onClick={() => navigate('/admin/shifts')} 
+                  className="flex items-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-purple-200 shadow-sm"
+                  title="View Till Audits"
+                >
+                  <Lock size={16} /> 
+                  <span className="hidden sm:inline">Till Audit</span>
+                </button>
+                {/* ------------------------------- */}
               </>
             )}
 
@@ -556,6 +625,25 @@ export default function Dashboard() {
               <RefreshCw size={18} /> <span className="hidden sm:inline">Refresh</span>
             </button>
             {/* --------------------------------------------- */}
+
+            {/* --- NEW: SHIFT MANAGEMENT BUTTON --- */}
+            {isShiftTrackingEnabled && (
+              <button 
+                onClick={() => {
+                  setShiftModalType(activeShift ? 'close' : 'open');
+                  setIsShiftModalOpen(true);
+                }}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-colors ${
+                  activeShift 
+                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300' // Quiet Close button
+                    : 'bg-red-600 text-white hover:bg-red-700 border border-red-700 animate-pulse' // Loud Open button
+                }`}
+              >
+                {activeShift ? <Lock size={16} /> : <LockOpen size={16} />}
+                <span className="hidden sm:inline">{activeShift ? 'Close Register' : 'Open Register'}</span>
+              </button>
+            )}
+            {/* ------------------------------------ */}
 
             <button onClick={handleLogout} className="flex items-center gap-2 text-red-600 hover:text-red-800 px-2">
               <LogOut size={18} /> <span className="hidden sm:inline">{t('logout')}</span>
@@ -767,6 +855,18 @@ export default function Dashboard() {
         onClose={() => {
           setIsWeightModalOpen(false);
           setProductToWeigh(null);
+        }}
+      />
+
+      {/* --- NEW: SHIFT MANAGER MODAL --- */}
+      <ShiftManagerModal 
+        isOpen={isShiftModalOpen}
+        type={shiftModalType}
+        activeShift={activeShift}
+        onClose={() => setIsShiftModalOpen(false)}
+        onSuccess={() => {
+          setIsShiftModalOpen(false);
+          fetchShiftStatus(); // Refresh the UI state after opening/closing
         }}
       />
 
